@@ -1,0 +1,18 @@
+{
+  "name": "gwiki3",
+  "version": "1.0.0",
+  "description": "Wiki application with GAS backend and Spreadsheet database",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --cwd frontend dev",
+    "build": "bun run --cwd frontend build",
+    "preview": "bun run --cwd frontend preview",
+    "backend:push": "cd backend && clasp push",
+    "backend:deploy": "cd backend && clasp deploy",
+    "backend:open": "cd backend && clasp open"
+  },
+  "keywords": ["gas", "wiki", "spreadsheet"],
+  "author": "",
+  "license": "MIT",
+  "workspaces": ["frontend", "backend"]
+}

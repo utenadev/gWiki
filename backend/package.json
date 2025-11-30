@@ -1,0 +1,15 @@
+{
+    "name": "gwiki3-backend",
+    "version": "1.0.0",
+    "description": "GAS backend for gWiki3",
+    "scripts": {
+        "build": "bun build src/Code.ts --outdir dist --target node",
+        "push": "clasp push",
+        "deploy": "clasp deploy",
+        "open": "clasp open"
+    },
+    "devDependencies": {
+        "@types/google-apps-script": "^1.0.83",
+        "typescript": "^5.3.3"
+    }
+}
