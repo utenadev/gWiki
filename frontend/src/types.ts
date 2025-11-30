@@ -2,6 +2,13 @@
  * Type definitions for the application
  */
 
+export interface PageVersion {
+    versionNumber: number;
+    content: string;
+    updatedAt: string;
+    updatedBy?: string;
+}
+
 export interface WikiPage {
     id: string;
     title: string;
@@ -9,6 +16,7 @@ export interface WikiPage {
     tags?: string[];
     createdAt: string;
     updatedAt: string;
+    versions?: PageVersion[];
 }
 
 export interface ApiResponse<T> {

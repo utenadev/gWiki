@@ -1,8 +1,8 @@
 /**
- * API client for communicating with GAS backend
+ * API client for interacting with the backend
  */
 
-import type { WikiPage, ApiResponse } from './types';
+import type { WikiPage, ApiResponse, PageVersion } from './types';
 
 // For development, use mock data
 const USE_MOCK = true;
@@ -131,12 +131,27 @@ class WikiApi {
             if (index === -1) {
                 throw new Error('Page not found');
             }
+
+            const currentPage = mockPages[index];
+            const versions = currentPage.versions || [];
+
+            // Add current version to history before updating
+            const newVersion: PageVersion = {
+                versionNumber: versions.length + 1,
+                content: currentPage.content,
+                updatedAt: currentPage.updatedAt,
+            };
+
+            // Keep only the last 5 versions
+            const updatedVersions = [newVersion, ...versions].slice(0, 5);
+
             mockPages[index] = {
-                ...mockPages[index],
+                ...currentPage,
                 title,
                 content,
                 tags,
                 updatedAt: new Date().toISOString(),
+                versions: updatedVersions,
             };
             return Promise.resolve(mockPages[index]);
         }
