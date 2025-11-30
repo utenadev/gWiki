@@ -38,7 +38,8 @@ export function HomePage() {
         const query = searchQuery.toLowerCase();
         return (
             page.title.toLowerCase().includes(query) ||
-            page.content.toLowerCase().includes(query)
+            page.content.toLowerCase().includes(query) ||
+            page.tags?.some(tag => tag.toLowerCase().includes(query))
         );
     });
 

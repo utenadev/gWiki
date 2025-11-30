@@ -115,7 +115,7 @@ export function PageView() {
                         <h1 className="text-4xl font-bold text-gray-800 mb-4">
                             {page.title}
                         </h1>
-                        <div className="flex items-center space-x-6 text-sm text-gray-500">
+                        <div className="flex items-center space-x-6 text-sm text-gray-500 mb-4">
                             <span className="flex items-center space-x-1">
                                 <span>📅</span>
                                 <span>作成: {formatDate(page.createdAt)}</span>
@@ -127,6 +127,20 @@ export function PageView() {
                                 </span>
                             )}
                         </div>
+
+                        {page.tags && page.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {page.tags.map((tag, index) => (
+                                    <Link
+                                        key={index}
+                                        to={`/?search=${encodeURIComponent(tag)}`}
+                                        className="px-3 py-1 text-sm font-semibold rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
+                                    >
+                                        #{tag}
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <WikiContent content={page.content} />

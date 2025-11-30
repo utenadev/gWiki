@@ -16,6 +16,7 @@ export function PageEditor() {
 
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
+    const [tags, setTags] = useState('');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
@@ -38,6 +39,7 @@ export function PageEditor() {
             if (page) {
                 setTitle(page.title);
                 setContent(page.content);
+                setTags(page.tags?.join(', ') || '');
             }
         } catch (err) {
             alert('Failed to load page: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -52,14 +54,16 @@ export function PageEditor() {
             return;
         }
 
+        const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
+
         try {
             setSaving(true);
             let savedPage: WikiPage;
 
             if (isEditMode && id) {
-                savedPage = await api.updatePage(id, title, content);
+                savedPage = await api.updatePage(id, title, content, tagList);
             } else {
-                savedPage = await api.createPage(title, content);
+                savedPage = await api.createPage(title, content, tagList);
             }
 
             navigate(`/page/${savedPage.id}`);
@@ -114,7 +118,7 @@ export function PageEditor() {
                     {!showPreview ? (
                         <div className="space-y-6">
                             <div>
-                                <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
+                                <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">
                                     Title
                                 </label>
                                 <input
@@ -123,12 +127,26 @@ export function PageEditor() {
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     placeholder="Enter page title..."
-                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-300 text-lg font-semibold"
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-300 text-lg font-semibold dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                                 />
                             </div>
 
                             <div>
-                                <label htmlFor="content" className="block text-sm font-semibold text-gray-700 mb-2">
+                                <label htmlFor="tags" className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">
+                                    Tags (comma separated)
+                                </label>
+                                <input
+                                    id="tags"
+                                    type="text"
+                                    value={tags}
+                                    onChange={(e) => setTags(e.target.value)}
+                                    placeholder="e.g. guide, tutorial, important"
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-300 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="content" className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">
                                     Content (Markdown)
                                 </label>
                                 <textarea
@@ -137,7 +155,7 @@ export function PageEditor() {
                                     onChange={(e) => setContent(e.target.value)}
                                     placeholder="Enter page content in Markdown format..."
                                     rows={20}
-                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-300 font-mono text-sm resize-y"
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-300 font-mono text-sm resize-y dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                                 />
                             </div>
 

@@ -13,6 +13,7 @@ const mockPages: WikiPage[] = [
         id: '1',
         title: 'gWiki3へようこそ',
         content: '# gWiki3へようこそ\n\n**Google Apps Script**と**Google Spreadsheet**で動作する、モダンなWikiアプリケーションです。\n\n## 機能\n\n- 📝 Markdownでページを作成・編集\n- 🎨 Tailwind CSSによる美しいモダンUI\n- ⚡ 高速でレスポンシブ\n- 🔒 Googleアカウントによる安全な認証\n- 🔗 Wikiリンク - [ページタイトル] で他のページにリンク\n\n## はじめに\n\n「新規ページ」ボタンをクリックして、最初のWikiページを作成しましょう！\n\n書式のヒントは [Markdown ガイド] を、実例は [テストページ] をご覧ください。\n\nまだ存在しないページ（例: [未作成ページ]）へのリンクも作成できます。赤色で表示されます。',
+        tags: ['welcome', 'guide', 'introduction'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     },
@@ -20,6 +21,7 @@ const mockPages: WikiPage[] = [
         id: '2',
         title: 'Markdown ガイド',
         content: '# Markdown ガイド\n\n## 見出し\n\n# 見出し1\n## 見出し2\n### 見出し3\n\n## 強調\n\n*斜体* または _斜体_\n**太字** または __太字__\n\n## リスト\n\n- 項目 1\n- 項目 2\n  - ネストした項目\n\n1. 最初\n2. 次\n\n## コード\n\nインライン `コード` はバッククォートで囲みます。\n\n```javascript\nconst hello = \"world\";\nconsole.log(hello);\n```\n\n## リンク\n\n[リンクテキスト](https://example.com)\n\n## 引用\n\n> これは引用です。\n\n## Wikiリンク\n\n[ページタイトル] という記法で、他のWikiページにリンクできます。\n\n例: [gWiki3へようこそ] や [テストページ]',
+        tags: ['markdown', 'guide', 'syntax'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     },
@@ -27,6 +29,7 @@ const mockPages: WikiPage[] = [
         id: '3',
         title: 'テストページ',
         content: '# テストページ\n\nWikiリンク機能を実演するためのテストページです。\n\n## このページについて\n\nこのページはWikiリンク機能をテストするために作成されました。他のページから [テストページ] という記法でこのページにリンクできます。\n\n## 関連ページ\n\n- [gWiki3へようこそ] - メインのウェルカムページ\n- [Markdown ガイド] - Markdown記法について学ぶ\n\nWikiリンクを使うと、関連するコンテンツを簡単に結びつけることができます！',
+        tags: ['test', 'demo', 'wiki-link'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     },
@@ -92,12 +95,13 @@ class WikiApi {
     /**
      * Create a new page
      */
-    async createPage(title: string, content: string): Promise<WikiPage> {
+    async createPage(title: string, content: string, tags: string[] = []): Promise<WikiPage> {
         if (USE_MOCK) {
             const newPage: WikiPage = {
                 id: String(mockPages.length + 1),
                 title,
                 content,
+                tags,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             };
@@ -107,7 +111,7 @@ class WikiApi {
 
         const response = await fetch(`${this.baseUrl}?path=create`, {
             method: 'POST',
-            body: JSON.stringify({ title, content }),
+            body: JSON.stringify({ title, content, tags }),
         });
         const data: ApiResponse<WikiPage> = await response.json();
 
@@ -121,7 +125,7 @@ class WikiApi {
     /**
      * Update an existing page
      */
-    async updatePage(id: string, title: string, content: string): Promise<WikiPage> {
+    async updatePage(id: string, title: string, content: string, tags: string[] = []): Promise<WikiPage> {
         if (USE_MOCK) {
             const index = mockPages.findIndex(p => p.id === id);
             if (index === -1) {
@@ -131,6 +135,7 @@ class WikiApi {
                 ...mockPages[index],
                 title,
                 content,
+                tags,
                 updatedAt: new Date().toISOString(),
             };
             return Promise.resolve(mockPages[index]);
@@ -138,7 +143,7 @@ class WikiApi {
 
         const response = await fetch(`${this.baseUrl}?path=update`, {
             method: 'POST',
-            body: JSON.stringify({ id, title, content }),
+            body: JSON.stringify({ id, title, content, tags }),
         });
         const data: ApiResponse<WikiPage> = await response.json();
 

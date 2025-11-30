@@ -41,6 +41,19 @@ export function PageCard({ page }: PageCardProps) {
                     {getPreview(page.content)}
                 </p>
 
+                {page.tags && page.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                        {page.tags.map((tag, index) => (
+                            <span
+                                key={index}
+                                className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300"
+                            >
+                                #{tag}
+                            </span>
+                        ))}
+                    </div>
+                )}
+
                 <div className="flex items-center justify-between text-sm text-gray-500">
                     <div className="flex items-center space-x-4">
                         <span className="flex items-center space-x-1">
