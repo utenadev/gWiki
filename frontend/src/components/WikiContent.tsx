@@ -82,8 +82,8 @@ export function WikiContent({ content }: WikiContentProps) {
                 // Convert to internal link with special marker
                 processed = processed.replace(regex, `[${title}](#/page/${link.pageId})`);
             } else {
-                // Keep as is but we'll style it differently
-                processed = processed.replace(regex, `[${title}](#missing:${title})`);
+                // Link to create new page
+                processed = processed.replace(regex, `[${title}](#/new?title=${encodeURIComponent(title)})`);
             }
         });
 
@@ -104,16 +104,18 @@ export function WikiContent({ content }: WikiContentProps) {
                         {children}
                     </Link>
                 );
-            } else if (href?.startsWith('#missing:')) {
-                const title = href.replace('#missing:', '');
+            } else if (href?.startsWith('#/new?title=')) {
+                const titleParam = href.replace('#/new?title=', '');
+                const title = decodeURIComponent(titleParam);
                 return (
-                    <span
+                    <Link
+                        to={`/new?title=${titleParam}`}
                         className="wiki-link wiki-link-missing"
-                        title={`Page "${title}" does not exist`}
+                        title={`Create page "${title}"`}
                         {...props}
                     >
                         {children}
-                    </span>
+                    </Link>
                 );
             }
 

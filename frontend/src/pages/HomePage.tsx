@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageCard } from '../components/PageCard';
 import { api } from '../api';
 import type { WikiPage } from '../types';
@@ -11,6 +12,9 @@ export function HomePage() {
     const [pages, setPages] = useState<WikiPage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const [searchParams] = useSearchParams();
+    const searchQuery = searchParams.get('search') || '';
 
     useEffect(() => {
         loadPages();
@@ -28,6 +32,15 @@ export function HomePage() {
             setLoading(false);
         }
     };
+
+    const filteredPages = pages.filter(page => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            page.title.toLowerCase().includes(query) ||
+            page.content.toLowerCase().includes(query)
+        );
+    });
 
     if (loading) {
         return (
@@ -60,26 +73,34 @@ export function HomePage() {
                     Welcome to gWiki<span className="text-purple-300">3</span>
                 </h1>
                 <p className="text-xl text-white/80">
-                    A modern wiki powered by Google Apps Script
+                    {searchQuery
+                        ? `Search results for "${searchQuery}"`
+                        : 'A modern wiki powered by Google Apps Script'
+                    }
                 </p>
             </div>
 
-            {pages.length === 0 ? (
+            {filteredPages.length === 0 ? (
                 <div className="card max-w-2xl mx-auto text-center">
-                    <div className="text-6xl mb-4">📝</div>
+                    <div className="text-6xl mb-4">
+                        {searchQuery ? '🔍' : '📝'}
+                    </div>
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                        No pages yet
+                        {searchQuery ? 'No matching pages found' : 'No pages yet'}
                     </h2>
                     <p className="text-gray-600 mb-6">
-                        Get started by creating your first wiki page!
+                        {searchQuery
+                            ? `We couldn't find any pages matching "${searchQuery}"`
+                            : 'Get started by creating your first wiki page!'
+                        }
                     </p>
                     <a href="/new" className="btn-primary inline-block">
-                        ✨ Create First Page
+                        ✨ Create New Page
                     </a>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {pages.map((page) => (
+                    {filteredPages.map((page) => (
                         <PageCard key={page.id} page={page} />
                     ))}
                 </div>

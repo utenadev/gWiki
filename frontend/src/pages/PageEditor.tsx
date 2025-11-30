@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { api } from '../api';
 import type { WikiPage } from '../types';
@@ -11,6 +11,7 @@ import type { WikiPage } from '../types';
 export function PageEditor() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const isEditMode = Boolean(id);
 
     const [title, setTitle] = useState('');
@@ -22,8 +23,13 @@ export function PageEditor() {
     useEffect(() => {
         if (id) {
             loadPage(id);
+        } else {
+            const titleParam = searchParams.get('title');
+            if (titleParam) {
+                setTitle(titleParam);
+            }
         }
-    }, [id]);
+    }, [id, searchParams]);
 
     const loadPage = async (pageId: string) => {
         try {
