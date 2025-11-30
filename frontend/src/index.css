@@ -12,6 +12,20 @@
   --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
 }
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -24,6 +38,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
+  transition: background 0.3s ease;
+}
+
+body.dark {
+  background: linear-gradient(135deg, #1a1c2c 0%, #4a192c 100%);
 }
 
 #root {
@@ -138,6 +157,11 @@ body {
   box-shadow: var(--shadow-md);
 }
 
+.dark .card {
+  background: rgba(30, 30, 40, 0.95);
+  color: #e2e8f0;
+}
+
 .card:hover {
   box-shadow: var(--shadow-xl);
   transform: translateY(-4px);
@@ -146,6 +170,10 @@ body {
 /* Markdown content styles */
 .markdown-content {
   @apply prose prose-lg max-w-none;
+}
+
+.dark .markdown-content {
+  @apply prose-invert;
 }
 
 .markdown-content h1 {
@@ -161,18 +189,35 @@ body {
   color: #667eea;
 }
 
+.dark .markdown-content h2 {
+  color: #a5b4fc;
+}
+
 .markdown-content h3 {
   @apply text-2xl font-semibold mb-2 mt-4;
   color: #764ba2;
+}
+
+.dark .markdown-content h3 {
+  color: #c084fc;
 }
 
 .markdown-content p {
   @apply mb-4 leading-relaxed text-gray-700;
 }
 
+.dark .markdown-content p {
+  @apply text-gray-300;
+}
+
 .markdown-content code {
   @apply bg-gray-100 px-2 py-1 rounded text-sm font-mono;
   color: #e83e8c;
+}
+
+.dark .markdown-content code {
+  @apply bg-gray-800;
+  color: #f472b6;
 }
 
 .markdown-content pre {
@@ -200,6 +245,10 @@ body {
   @apply border-l-4 border-primary-500 pl-4 italic my-4 text-gray-600;
 }
 
+.dark .markdown-content blockquote {
+  @apply text-gray-400;
+}
+
 /* Wiki link styles */
 .wiki-link {
   @apply font-semibold transition-all duration-200;
@@ -211,6 +260,11 @@ body {
   text-decoration-color: #667eea;
 }
 
+.dark .wiki-link-exists {
+  @apply text-purple-400 hover:text-purple-300;
+  text-decoration-color: #a5b4fc;
+}
+
 .wiki-link-exists:hover {
   text-decoration: none;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -219,12 +273,28 @@ body {
   background-clip: text;
 }
 
+.dark .wiki-link-exists:hover {
+  background: linear-gradient(135deg, #a5b4fc 0%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 .wiki-link-missing {
-  @apply text-red-500 cursor-not-allowed;
+  @apply text-red-500 cursor-pointer;
   text-decoration-style: dotted;
   text-decoration-color: #ef4444;
 }
 
 .wiki-link-missing:hover {
   @apply text-red-600;
+}
+
+.dark .wiki-link-missing {
+  @apply text-red-400;
+  text-decoration-color: #f87171;
+}
+
+.dark .wiki-link-missing:hover {
+  @apply text-red-300;
 }

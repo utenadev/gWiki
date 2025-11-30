@@ -4,9 +4,11 @@
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTheme } from './ThemeProvider';
 
 export function Header() {
     const navigate = useNavigate();
+    const { theme, toggleTheme } = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
 
     const handleSearch = (e: React.FormEvent) => {
@@ -32,6 +34,14 @@ export function Header() {
                     </Link>
 
                     <div className="flex items-center space-x-6">
+                        <button
+                            onClick={toggleTheme}
+                            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-xl"
+                            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                        >
+                            {theme === 'dark' ? '☀️' : '🌙'}
+                        </button>
+
                         <form onSubmit={handleSearch} className="relative group">
                             <input
                                 type="text"
