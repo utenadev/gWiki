@@ -175,6 +175,30 @@ class WikiApi {
 
         return data.success && data.data?.deleted === true;
     }
+
+    /**
+     * Get backlinks for a page (pages that link to this page)
+     */
+    async getBacklinks(pageTitle: string): Promise<WikiPage[]> {
+        if (USE_MOCK) {
+            // Find all pages that contain a wiki link to the given page title
+            const backlinks = mockPages.filter(page => {
+                const wikiLinkPattern = /\[([^\]]+)\](?!\()/g;
+                const matches = [...page.content.matchAll(wikiLinkPattern)];
+                return matches.some(match => match[1] === pageTitle);
+            });
+            return Promise.resolve(backlinks);
+        }
+
+        const response = await fetch(`${this.baseUrl}?path=backlinks&title=${encodeURIComponent(pageTitle)}`);
+        const data: ApiResponse<WikiPage[]> = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to get backlinks');
+        }
+
+        return data.data || [];
+    }
 }
 
 export const api = new WikiApi();

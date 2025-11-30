@@ -12,6 +12,7 @@ export function PageView() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [page, setPage] = useState<WikiPage | null>(null);
+    const [backlinks, setBacklinks] = useState<WikiPage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -29,6 +30,9 @@ export function PageView() {
             const data = await api.getPageById(pageId);
             if (data) {
                 setPage(data);
+                // Load backlinks for this page
+                const links = await api.getBacklinks(data.title);
+                setBacklinks(links);
             } else {
                 setError('Page not found');
             }
@@ -145,6 +149,34 @@ export function PageView() {
 
                     <WikiContent content={page.content} />
                 </div>
+
+                {backlinks.length > 0 && (
+                    <div className="card animate-fade-in mt-6">
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
+                            <span className="mr-2">🔗</span>
+                            バックリンク
+                        </h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            このページにリンクしているページ ({backlinks.length})
+                        </p>
+                        <div className="space-y-2">
+                            {backlinks.map((backlink) => (
+                                <Link
+                                    key={backlink.id}
+                                    to={`/page/${backlink.id}`}
+                                    className="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    <div className="font-semibold text-purple-600 dark:text-purple-400">
+                                        {backlink.title}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                        {new Date(backlink.updatedAt).toLocaleDateString('ja-JP')}
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
