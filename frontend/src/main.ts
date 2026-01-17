@@ -1,35 +1,52 @@
 import Alpine from 'alpinejs'
 import { marked } from 'marked'
-import type { Page, ApiError } from './types'
+import type { Page, Peer, ApiError } from './types'
 import { api } from './api'
+
+// ========================================
+// Shared Utilities
+// ========================================
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('ja-JP')
+}
+
+async function renderMarkdown(content: string): Promise<string> {
+  return await marked.parse(content)
+}
+
+function getErrorMessage(e: unknown): string {
+  return (e as ApiError).message || 'Operation failed'
+}
 
 // ========================================
 // Global Store: Theme
 // ========================================
+type ThemeStore = {
+  dark: boolean
+  init(): void
+  toggle(): void
+  apply(): void
+}
+
 Alpine.store('theme', {
   dark: false,
 
-  init(this: { dark: boolean; apply: () => void }) {
-    // Check localStorage or system preference
+  init(this: ThemeStore) {
     const stored = localStorage.getItem('theme')
-    if (stored) {
-      this.dark = stored === 'dark'
-    } else {
-      this.dark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    }
+    this.dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
     this.apply()
   },
 
-  toggle(this: { dark: boolean; apply: () => void }) {
+  toggle(this: ThemeStore) {
     this.dark = !this.dark
     this.apply()
     localStorage.setItem('theme', this.dark ? 'dark' : 'light')
   },
 
-  apply(this: { dark: boolean }) {
+  apply(this: ThemeStore) {
     document.documentElement.classList.toggle('dark', this.dark)
   }
-})
+} as ThemeStore)
 
 // ========================================
 // App Router
@@ -74,15 +91,13 @@ function homePage() {
       try {
         this.pages = await api.getPages()
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to load pages'
+        this.error = getErrorMessage(e)
       } finally {
         this.loading = false
       }
     },
 
-    formatDate(dateStr: string): string {
-      return new Date(dateStr).toLocaleDateString('ja-JP')
-    }
+    formatDate
   }
 }
 
@@ -100,17 +115,16 @@ function pageView(initialPageId: string) {
 
     init() {
       this.loadPage()
-      // Listen for route change events
-      window.addEventListener('route-change', (e: CustomEvent) => {
+      window.addEventListener('route-change', ((e: CustomEvent) => {
         const newRoute = e.detail.route
-        if (newRoute && newRoute.startsWith('page/')) {
+        if (newRoute?.startsWith('page/')) {
           const newPageId = newRoute.split('/')[1]
-          if (newPageId !== this.pageId) {
+          if (newPageId && newPageId !== this.pageId) {
             this.pageId = newPageId
             this.loadPage()
           }
         }
-      })
+      }) as EventListener)
     },
 
     async loadPage() {
@@ -120,33 +134,25 @@ function pageView(initialPageId: string) {
         this.page = await api.getPage(this.pageId)
         this.versions = await api.getPageVersions(this.pageId)
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to load page'
+        this.error = getErrorMessage(e)
       } finally {
         this.loading = false
       }
     },
 
-    async renderContent(content: string): Promise<string> {
-      return await marked.parse(content)
-    },
-
-    formatDate(dateStr: string): string {
-      return new Date(dateStr).toLocaleDateString('ja-JP')
-    },
-
+    renderContent: renderMarkdown,
+    formatDate,
     toggleVersions() {
       this.showingVersions = !this.showingVersions
     },
 
     async deletePage() {
-      if (!this.page || !confirm(`Are you sure you want to delete "${this.page.title}"?`)) {
-        return
-      }
+      if (!this.page || !confirm(`Delete "${this.page.title}"?`)) return
       try {
         await api.deletePage(this.pageId)
         location.hash = '#/'
       } catch (e) {
-        alert('Failed to delete page: ' + (e as ApiError).message)
+        alert('Delete failed: ' + getErrorMessage(e))
       }
     }
   }
@@ -176,16 +182,14 @@ function pageEditor(pageId?: string) {
           this.content = page.content
           this.tags = page.tags?.join(', ') || ''
         } catch (e) {
-          this.error = (e as ApiError).message || 'Failed to load page'
+          this.error = getErrorMessage(e)
         } finally {
           this.loading = false
         }
       }
     },
 
-    async renderContent(content: string): Promise<string> {
-      return await marked.parse(content)
-    },
+    renderContent: renderMarkdown,
 
     async save() {
       if (!this.title.trim()) {
@@ -207,20 +211,15 @@ function pageEditor(pageId?: string) {
           this.isEditMode = true
         }
 
-        // Navigate to page view
         location.hash = `#/page/${this.pageId}`
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to save page'
+        this.error = getErrorMessage(e)
         this.saving = false
       }
     },
 
     cancel() {
-      if (this.isEditMode && this.pageId) {
-        location.hash = `#/page/${this.pageId}`
-      } else {
-        location.hash = '#/'
-      }
+      location.hash = this.isEditMode && this.pageId ? `#/page/${this.pageId}` : '#/'
     }
   }
 }
@@ -238,7 +237,7 @@ function brokenLinksAdmin() {
       try {
         this.brokenLinks = await api.getBrokenLinks()
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to load broken links'
+        this.error = getErrorMessage(e)
       } finally {
         this.loading = false
       }
@@ -259,20 +258,30 @@ function orphanedPagesAdmin() {
       try {
         this.orphanedPages = await api.getOrphanedPages()
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to load orphaned pages'
+        this.error = getErrorMessage(e)
       } finally {
         this.loading = false
       }
-    }
+    },
+
+    formatDate
   }
 }
 
 // ========================================
 // Admin: Stats
 // ========================================
+type Stats = {
+  totalPages: number
+  totalLinks: number
+  totalTags: number
+  brokenLinks: number
+  orphanedPages: number
+}
+
 function statsAdmin() {
   return {
-    stats: null as { totalPages: number; totalLinks: number; totalTags: number; brokenLinks: number; orphanedPages: number } | null,
+    stats: null as Stats | null,
     loading: true,
     error: null as string | null,
 
@@ -280,7 +289,7 @@ function statsAdmin() {
       try {
         this.stats = await api.getStats()
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to load stats'
+        this.error = getErrorMessage(e)
       } finally {
         this.loading = false
       }
@@ -293,7 +302,7 @@ function statsAdmin() {
 // ========================================
 function peerManagement() {
   return {
-    peers: [] as import('./types').Peer[],
+    peers: [] as Peer[],
     loading: true,
     error: null as string | null,
     showAddForm: false,
@@ -304,7 +313,7 @@ function peerManagement() {
       try {
         this.peers = await api.getPeers()
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to load peers'
+        this.error = getErrorMessage(e)
       } finally {
         this.loading = false
       }
@@ -326,16 +335,14 @@ function peerManagement() {
         this.newPeerName = ''
         this.showAddForm = false
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to add peer'
+        this.error = getErrorMessage(e)
       } finally {
         this.loading = false
       }
     },
 
     async removePeer(id: string) {
-      if (!confirm('Are you sure you want to remove this peer?')) {
-        return
-      }
+      if (!confirm('Remove this peer?')) return
 
       this.loading = true
       try {
@@ -346,15 +353,14 @@ function peerManagement() {
           this.error = 'Failed to remove peer'
         }
       } catch (e) {
-        this.error = (e as ApiError).message || 'Failed to remove peer'
+        this.error = getErrorMessage(e)
       } finally {
         this.loading = false
       }
     },
 
     formatDate(dateStr?: string): string {
-      if (!dateStr) return 'Never'
-      return new Date(dateStr).toLocaleDateString('ja-JP')
+      return dateStr ? formatDate(dateStr) : 'Never'
     },
 
     toggleAddForm() {
@@ -379,26 +385,6 @@ Alpine.data('peerManagement', peerManagement)
 
 // Start Alpine
 Alpine.start()
-
-// Create global navigate function for click handlers
-window.navigate = function(path: string) {
-  location.hash = path
-}
-
-// Declare global window types for Alpine
-declare global {
-  interface Window {
-    wikiApp: typeof wikiApp
-    homePage: typeof homePage
-    pageView: typeof pageView
-    pageEditor: typeof pageEditor
-    brokenLinksAdmin: typeof brokenLinksAdmin
-    orphanedPagesAdmin: typeof orphanedPagesAdmin
-    statsAdmin: typeof statsAdmin
-    peerManagement: typeof peerManagement
-    navigate: (path: string) => void
-  }
-}
 
 // Export for type checking
 export {

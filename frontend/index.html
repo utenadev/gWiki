@@ -21,7 +21,7 @@
               <span class="text-xl font-bold text-purple-600 dark:text-purple-400">gWiki</span>
             </a>
             <nav class="flex items-center space-x-4">
-              <button @click="$store.theme.toggle()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+              <button @click="$store.theme.toggle()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Toggle theme">
                 <span x-show="$store.theme.dark">🌙</span>
                 <span x-show="!$store.theme.dark">☀️</span>
               </button>
@@ -544,7 +544,7 @@
                       <template x-for="page in orphanedPages" :key="page.id">
                         <a :href="'#/page/' + page.id" @click.prevent="navigate('page/' + page.id)" class="block p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
                           <div class="font-semibold text-purple-600 dark:text-purple-400" x-text="page.title"></div>
-                          <div class="text-sm text-gray-500 dark:text-gray-400 mt-1" x-text="new Date(page.updatedAt).toLocaleDateString('ja-JP')"></div>
+                          <div class="text-sm text-gray-500 dark:text-gray-400 mt-1" x-text="formatDate(page.updatedAt)"></div>
                         </a>
                       </template>
                     </div>
@@ -782,7 +782,7 @@
         </template>
 
         <!-- 404 -->
-        <template x-if="route && !route.startsWith('page/') && !route.startsWith('edit/') && !route.startsWith('admin/') && route !== 'new'">
+        <template x-if="route && route !== '' && route !== 'new' && !route.startsWith('page/') && !route.startsWith('edit/') && !route.startsWith('admin/')">
           <div class="text-center py-12">
             <h1 class="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">404</h1>
             <p class="text-gray-600 dark:text-gray-400">Page not found</p>
