@@ -268,6 +268,85 @@ function statsAdmin() {
   }
 }
 
+// ========================================
+// Peer Management
+// ========================================
+function peerManagement() {
+  return {
+    peers: [] as import('./types').Peer[],
+    loading: true,
+    error: null as string | null,
+    showAddForm: false,
+    newPeerUrl: '',
+    newPeerName: '',
+
+    async init() {
+      try {
+        this.peers = await api.getPeers()
+      } catch (e) {
+        this.error = (e as ApiError).message || 'Failed to load peers'
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async addPeer() {
+      if (!this.newPeerUrl.trim() || !this.newPeerName.trim()) {
+        this.error = 'URL and Name are required'
+        return
+      }
+
+      this.loading = true
+      this.error = null
+
+      try {
+        const peer = await api.addPeer(this.newPeerUrl, this.newPeerName)
+        this.peers.push(peer)
+        this.newPeerUrl = ''
+        this.newPeerName = ''
+        this.showAddForm = false
+      } catch (e) {
+        this.error = (e as ApiError).message || 'Failed to add peer'
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async removePeer(id: string) {
+      if (!confirm('Are you sure you want to remove this peer?')) {
+        return
+      }
+
+      this.loading = true
+      try {
+        const success = await api.removePeer(id)
+        if (success) {
+          this.peers = this.peers.filter(p => p.id !== id)
+        } else {
+          this.error = 'Failed to remove peer'
+        }
+      } catch (e) {
+        this.error = (e as ApiError).message || 'Failed to remove peer'
+      } finally {
+        this.loading = false
+      }
+    },
+
+    formatDate(dateStr?: string): string {
+      if (!dateStr) return 'Never'
+      return new Date(dateStr).toLocaleDateString('ja-JP')
+    },
+
+    toggleAddForm() {
+      this.showAddForm = !this.showAddForm
+      if (!this.showAddForm) {
+        this.newPeerUrl = ''
+        this.newPeerName = ''
+      }
+    }
+  }
+}
+
 // Register Alpine components
 Alpine.data('wikiApp', wikiApp)
 Alpine.data('homePage', homePage)
@@ -276,6 +355,7 @@ Alpine.data('pageEditor', pageEditor)
 Alpine.data('brokenLinksAdmin', brokenLinksAdmin)
 Alpine.data('orphanedPagesAdmin', orphanedPagesAdmin)
 Alpine.data('statsAdmin', statsAdmin)
+Alpine.data('peerManagement', peerManagement)
 
 // Start Alpine
 Alpine.start()
@@ -290,6 +370,7 @@ declare global {
     brokenLinksAdmin: typeof brokenLinksAdmin
     orphanedPagesAdmin: typeof orphanedPagesAdmin
     statsAdmin: typeof statsAdmin
+    peerManagement: typeof peerManagement
   }
 }
 
@@ -301,5 +382,6 @@ export {
   pageEditor,
   brokenLinksAdmin,
   orphanedPagesAdmin,
-  statsAdmin
+  statsAdmin,
+  peerManagement
 }

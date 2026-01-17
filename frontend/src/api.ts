@@ -2,12 +2,14 @@
  * API client for interacting with the backend
  */
 
-import type { WikiPage, ApiResponse, PageVersion } from './types';
+import type { WikiPage, ApiResponse, PageVersion, Peer } from './types';
 
 // For development, use mock data
 const USE_MOCK = true;
 
 // Mock data for development
+const mockPeers: Peer[] = [];
+
 const mockPages: WikiPage[] = [
     {
         id: '1',
@@ -400,6 +402,75 @@ class WikiApi {
             brokenLinks: 0,
             orphanedPages: 0,
         };
+    }
+
+    /**
+     * Get all peers
+     */
+    async getPeers(): Promise<Peer[]> {
+        if (USE_MOCK) {
+            return Promise.resolve(mockPeers);
+        }
+
+        const response = await fetch(`${this.baseUrl}?path=peers`);
+        const data: ApiResponse<Peer[]> = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to get peers');
+        }
+
+        return data.data || [];
+    }
+
+    /**
+     * Add a new peer
+     */
+    async addPeer(url: string, name: string): Promise<Peer> {
+        if (USE_MOCK) {
+            const newPeer: Peer = {
+                id: String(mockPeers.length + 1),
+                url,
+                name,
+                isActive: true,
+                lastSyncedAt: new Date().toISOString(),
+            };
+            mockPeers.push(newPeer);
+            return Promise.resolve(newPeer);
+        }
+
+        const response = await fetch(`${this.baseUrl}?path=add_peer`, {
+            method: 'POST',
+            body: JSON.stringify({ url, name }),
+        });
+        const data: ApiResponse<Peer> = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to add peer');
+        }
+
+        return data.data!;
+    }
+
+    /**
+     * Remove a peer
+     */
+    async removePeer(id: string): Promise<boolean> {
+        if (USE_MOCK) {
+            const index = mockPeers.findIndex(p => p.id === id);
+            if (index === -1) {
+                return Promise.resolve(false);
+            }
+            mockPeers.splice(index, 1);
+            return Promise.resolve(true);
+        }
+
+        const response = await fetch(`${this.baseUrl}?path=remove_peer`, {
+            method: 'POST',
+            body: JSON.stringify({ id }),
+        });
+        const data: ApiResponse<{ removed: boolean }> = await response.json();
+
+        return data.success && data.data?.removed === true;
     }
 }
 

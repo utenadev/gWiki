@@ -24,7 +24,8 @@
                 <span x-show="$store.theme.dark">🌙</span>
                 <span x-show="!$store.theme.dark">☀️</span>
               </button>
-              <a href="#/admin/broken-links" @click.prevent="navigate('admin/broken-links')" class="text-sm text-gray-600 dark:text-gray-300 hover:text-purple-600">Admin</a>
+              <a href="#/admin/peers" @click.prevent="navigate('admin/peers')" class="text-sm text-gray-600 dark:text-gray-300 hover:text-purple-600">Peers</a>
+              <a href="#/admin/stats" @click.prevent="navigate('admin/stats')" class="text-sm text-gray-600 dark:text-gray-300 hover:text-purple-600">Stats</a>
             </nav>
           </div>
         </div>
@@ -65,6 +66,11 @@
         <!-- Stats Admin -->
         <template x-if="route === 'admin/stats'">
           <div x-data="statsAdmin()"></div>
+        </template>
+
+        <!-- Peer Management -->
+        <template x-if="route === 'admin/peers'">
+          <div x-data="peerManagement()"></div>
         </template>
 
         <!-- 404 -->
