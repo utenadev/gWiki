@@ -39,6 +39,35 @@
 
 **Commit**: `a487d23 feat: migrate frontend from React to Alpine.js`
 
+### Alpine.jsルーティングのバグ修正
+
+**問題**: Alpine.js移行後、以下の問題が発覚：
+- URL `/#/page/1`, `/#/page/2`, `/#/page/3` に遷移しても、常に同じページの内容が表示される
+- ナビゲーションリンクをクリックしてもページ遷移しない
+
+**原因調査**:
+1. `parseRoute` が先頭の `/` を削除していなかった（`route` が `/page/1` になっていた）
+2. `route.match(/^page\//)` がAlpine.jsで期待通りに動作していなかった
+3. `<template x-if>` 内の `x-data` コンポーネントは、条件が `true` のままだと再初期化されない
+4. `$root.navigate` が関数として認識されていなかった
+
+**修正内容**:
+- **`frontend/src/main.ts`**:
+  - `parseRoute` で先頭の `/` を削除するように修正
+  - route変更時にカスタムイベント `route-change` を発火
+  - pageViewで `route-change` イベントを監視し、pageId変更時に `loadPage()` を呼ぶ
+  - グローバルな `window.navigate` 関数を追加
+- **`frontend/index.html`**:
+  - `route.match(/^page\//)` → `route.startsWith('page/')` に変更
+  - `route.match(/^(page|edit|admin)\//)` → `startsWith` の連結に変更
+  - `$root.navigate()` → `navigate()` に置換（全箇所）
+
+**テスト結果**: ✅
+- Page 1, 2, 3 が正しく表示されることを確認
+- ナビゲーションリンク（Home, Back, Peers, Stats）が正常に動作
+
+**使用ツール**: agent-browser（ブラウザ自動化ツール）
+
 ---
 
 ## 2026-01-16

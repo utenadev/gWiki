@@ -45,11 +45,14 @@ function wikiApp() {
       // Listen for hash changes
       window.addEventListener('hashchange', () => {
         this.route = this.parseRoute(location.hash.slice(1))
+        // Dispatch custom event for route changes
+        window.dispatchEvent(new CustomEvent('route-change', { detail: { route: this.route } }))
       })
     },
 
     parseRoute(hash: string) {
-      return hash
+      // Remove leading slash for consistent route matching
+      return hash.replace(/^\//, '')
     },
 
     navigate(path: string) {
@@ -86,16 +89,33 @@ function homePage() {
 // ========================================
 // Page View
 // ========================================
-function pageView(pageId: string) {
+function pageView(initialPageId: string) {
   return {
-    pageId,
+    pageId: initialPageId,
     page: null as Page | null,
     versions: [] as Page[],
     loading: true,
     error: null as string | null,
     showingVersions: false,
 
-    async init() {
+    init() {
+      this.loadPage()
+      // Listen for route change events
+      window.addEventListener('route-change', (e: CustomEvent) => {
+        const newRoute = e.detail.route
+        if (newRoute && newRoute.startsWith('page/')) {
+          const newPageId = newRoute.split('/')[1]
+          if (newPageId !== this.pageId) {
+            this.pageId = newPageId
+            this.loadPage()
+          }
+        }
+      })
+    },
+
+    async loadPage() {
+      this.loading = true
+      this.error = null
       try {
         this.page = await api.getPage(this.pageId)
         this.versions = await api.getPageVersions(this.pageId)
@@ -360,6 +380,11 @@ Alpine.data('peerManagement', peerManagement)
 // Start Alpine
 Alpine.start()
 
+// Create global navigate function for click handlers
+window.navigate = function(path: string) {
+  location.hash = path
+}
+
 // Declare global window types for Alpine
 declare global {
   interface Window {
@@ -371,6 +396,7 @@ declare global {
     orphanedPagesAdmin: typeof orphanedPagesAdmin
     statsAdmin: typeof statsAdmin
     peerManagement: typeof peerManagement
+    navigate: (path: string) => void
   }
 }
 
