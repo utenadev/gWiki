@@ -19,10 +19,17 @@ export interface WikiPage {
     versions?: PageVersion[];
 }
 
+// Alias for WikiPage for convenience
+export type Page = WikiPage;
+
 export interface ApiResponse<T> {
     success: boolean;
     data?: T;
     error?: string;
+}
+
+export interface ApiError extends Error {
+    message: string;
 }
 
 export interface AppConfig {

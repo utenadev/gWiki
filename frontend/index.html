@@ -1,17 +1,83 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="gWiki3 - A modern wiki application powered by Google Apps Script" />
-    <title>gWiki3 - Modern Wiki Application</title>
+    <meta name="description" content="gWiki - A federated wiki application powered by Google Apps Script" />
+    <title>gWiki - Federated Wiki</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+    <div id="app" x-data="wikiApp()" x-init="init()" class="min-h-screen">
+      <!-- Header -->
+      <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex justify-between items-center h-16">
+            <a href="#/" @click.prevent="navigate('')" class="flex items-center space-x-2">
+              <span class="text-xl font-bold text-purple-600 dark:text-purple-400">gWiki</span>
+            </a>
+            <nav class="flex items-center space-x-4">
+              <button @click="$store.theme.toggle()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                <span x-show="$store.theme.dark">🌙</span>
+                <span x-show="!$store.theme.dark">☀️</span>
+              </button>
+              <a href="#/admin/broken-links" @click.prevent="navigate('admin/broken-links')" class="text-sm text-gray-600 dark:text-gray-300 hover:text-purple-600">Admin</a>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Home Page -->
+        <template x-if="route === ''">
+          <div x-data="homePage()"></div>
+        </template>
+
+        <!-- Page View -->
+        <template x-if="route.match(/^page\//)">
+          <div x-data="pageView(route.split('/')[1])"></div>
+        </template>
+
+        <!-- Page Editor -->
+        <template x-if="route.match(/^edit\//)">
+          <div x-data="pageEditor(route.split('/')[1])"></div>
+        </template>
+
+        <!-- New Page -->
+        <template x-if="route === 'new'">
+          <div x-data="pageEditor()"></div>
+        </template>
+
+        <!-- Broken Links Admin -->
+        <template x-if="route === 'admin/broken-links'">
+          <div x-data="brokenLinksAdmin()"></div>
+        </template>
+
+        <!-- Orphaned Pages Admin -->
+        <template x-if="route === 'admin/orphaned-pages'">
+          <div x-data="orphanedPagesAdmin()"></div>
+        </template>
+
+        <!-- Stats Admin -->
+        <template x-if="route === 'admin/stats'">
+          <div x-data="statsAdmin()"></div>
+        </template>
+
+        <!-- 404 -->
+        <template x-if="route && !route.match(/^(page|edit|admin)\//) && route !== 'new'">
+          <div class="text-center py-12">
+            <h1 class="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">404</h1>
+            <p class="text-gray-600 dark:text-gray-400">Page not found</p>
+            <a href="#/" @click.prevent="navigate('')" class="mt-4 inline-block text-purple-600 hover:text-purple-700">Go home</a>
+          </div>
+        </template>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
