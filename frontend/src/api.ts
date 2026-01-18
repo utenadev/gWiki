@@ -2,7 +2,7 @@
  * API client for interacting with the backend
  */
 
-import type { WikiPage, ApiResponse, PageVersion, Peer } from './types';
+import type { WikiPage, ApiResponse, PageVersion, Peer, ExternalWiki } from './types';
 
 // For development, use mock data
 const USE_MOCK = true;
@@ -471,6 +471,66 @@ class WikiApi {
         const data: ApiResponse<{ removed: boolean }> = await response.json();
 
         return data.success && data.data?.removed === true;
+    }
+
+    // --- External Wiki Management ---
+
+    /**
+     * Get all external indexed wikis
+     */
+    async getExternalIndex(): Promise<ExternalWiki[]> {
+        if (USE_MOCK) {
+            return Promise.resolve([]);
+        }
+
+        const response = await fetch(`${this.baseUrl}?path=external_index`);
+        const data: ApiResponse<ExternalWiki[]> = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to get external index');
+        }
+
+        return data.data || [];
+    }
+
+    /**
+     * Add an external wiki to the index
+     */
+    async addExternalWiki(
+        wikiId: string,
+        title: string,
+        description: string,
+        accessUrl: string,
+        tags: string = ''
+    ): Promise<boolean> {
+        if (USE_MOCK) {
+            return Promise.resolve(true);
+        }
+
+        const response = await fetch(`${this.baseUrl}?path=add_external_wiki`, {
+            method: 'POST',
+            body: JSON.stringify({ wikiId, title, description, accessUrl, tags }),
+        });
+        const data: ApiResponse<unknown> = await response.json();
+
+        return data.success;
+    }
+
+    /**
+     * Remove an external wiki from the index
+     */
+    async removeExternalWiki(accessUrl: string): Promise<boolean> {
+        if (USE_MOCK) {
+            return Promise.resolve(true);
+        }
+
+        const response = await fetch(`${this.baseUrl}?path=remove_external_wiki`, {
+            method: 'POST',
+            body: JSON.stringify({ accessUrl }),
+        });
+        const data: ApiResponse<unknown> = await response.json();
+
+        return data.success;
     }
 }
 

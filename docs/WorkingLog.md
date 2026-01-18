@@ -1,79 +1,233 @@
-# 作業ログ
+# gWiki 作業ログ
 
-## 2026-01-17
+## 2026-01-18
 
-### フロントエンド：React → Alpine.js 移行
+### ページ階層化とポリシーベース・パーティショニングの実装
 
-**背景**: Reactの知識が不要であり、gWikiのようなコンテンツ重視のアプリにはAlpine.js + Tailwind CSSの組み合わせが最適であるとの判断。
+**目的**: ページ名による階層化（ディレクトリ構造）のサポートと、アクセスポリシーに基づくデータ格納の分離を実現する。
 
-**実装内容**:
-- **フレームワーク変更**: React → Alpine.js 3.14.0
-  - Reactの仮想DOMとJSXをAlpine.jsの宣言的ディレクティブ（x-data, x-if, x-show等）に置き換え
-  - TypeScript + Vite環境は維持
-- **ルーティング**: Hashベースのシンプルなルーティングを実装
-  - `#/` → ホーム（ページ一覧）
-  - `#/page/:id` → ページ表示
-  - `#/edit/:id` → ページ編集
-  - `#/new` → 新規ページ作成
-  - `#/admin/*` → 管理ページ
-- **コンポーネント移行**:
-  - `homePage()`: ページ一覧表示
-  - `pageView(id)`: ページ表示、バージョン履歴
-  - `pageEditor(id?)`: 新規作成/編集、プレビュー機能
-  - `brokenLinksAdmin()`: リンク切れ管理
-  - `orphanedPagesAdmin()`: 孤立ページ管理
-  - `statsAdmin()`: 統計ダッシュボード
-- **グローバルステート**: `Alpine.store('theme')` でダーク/ライトテーマ切り替えを実装
-- **APIクライアット**: `getPages()`, `getPage()`, `createPage()`, `updatePage()`, `deletePage()` などのメソッドを追加
+#### 実装内容
 
-**成果**:
-- コード量: 26ファイル変更、+1296行/-2366行（約45%削減）
-- バンドルサイズ: Alpine.jsは約15KB（Reactは約130KB）
-- 型安全性: TypeScript維持、`@types/alpinejs`導入
-- 開発体験: モックモード（USE_MOCK=true）でオフライン開発可能
+1. **GASローカルテスト環境 (Mock) の構築**
+   - `backend/tests/mocks/gas.ts` を作成し、GAS固有のオブジェクト（SpreadsheetApp, PropertiesService, LockService等）をモック化。
+   - `bun test` を利用したローカルでのユニットテスト環境を整備。
+   - `Taskfile.yml` に `test:backend` タスクを追加。
 
-**テスト結果**: ✅
-- Vite devサーバー正常起動（http://localhost:3000）
-- HTML生成、Alpine.jsディレクティブ適用確認
-- TypeScriptコンパイル成功
+2. **データ構造の刷新 (Policy Based Partitioning)**
+   - `Pages` シートを「インデックス」として定義し、メタデータ（ID, Path, PolicyID, Title等）のみを保持。
+   - ページ本文をポリシーごとに分割されたシート（`Store_Public`, `Store_Admin`）に格納する仕組みを導入。
+   - ページパスに基づくポリシー自動判定（`admin/` プレフィックスで `admin` ポリシーを適用）を実装。
 
-**Commit**: `a487d23 feat: migrate frontend from React to Alpine.js`
+3. **DBロジックのリファクタリング**
+   - `backend/src/db.ts` を `DB` クラスとして再構築。
+   - インデックスからの検索と、ストアからのコンテンツ取得を組み合わせたデータ取得フローを実装。
 
-### Alpine.jsルーティングのバグ修正
+4. **型定義の更新**
+   - `backend` および `frontend` の `WikiPage` インターフェースに `path` と `policyId` フィールドを追加。
 
-**問題**: Alpine.js移行後、以下の問題が発覚：
-- URL `/#/page/1`, `/#/page/2`, `/#/page/3` に遷移しても、常に同じページの内容が表示される
-- ナビゲーションリンクをクリックしてもページ遷移しない
+#### 動作確認
 
-**原因調査**:
-1. `parseRoute` が先頭の `/` を削除していなかった（`route` が `/page/1` になっていた）
-2. `route.match(/^page\//)` がAlpine.jsで期待通りに動作していなかった
-3. `<template x-if>` 内の `x-data` コンポーネントは、条件が `true` のままだと再初期化されない
-4. `$root.navigate` が関数として認識されていなかった
-
-**修正内容**:
-- **`frontend/src/main.ts`**:
-  - `parseRoute` で先頭の `/` を削除するように修正
-  - route変更時にカスタムイベント `route-change` を発火
-  - pageViewで `route-change` イベントを監視し、pageId変更時に `loadPage()` を呼ぶ
-  - グローバルな `window.navigate` 関数を追加
-- **`frontend/index.html`**:
-  - `route.match(/^page\//)` → `route.startsWith('page/')` に変更
-  - `route.match(/^(page|edit|admin)\//)` → `startsWith` の連結に変更
-  - `$root.navigate()` → `navigate()` に置換（全箇所）
-
-**テスト結果**: ✅
-- Page 1, 2, 3 が正しく表示されることを確認
-- ナビゲーションリンク（Home, Back, Peers, Stats）が正常に動作
-
-**使用ツール**: agent-browser（ブラウザ自動化ツール）
+- `task test:backend` にて、新規ページ作成および取得のロジックが正常に動作することを確認済み。
 
 ---
 
-## 2026-01-16
-- **分散化に向けたプロジェクト初期化**:
-    - `gWiki` をスタンドアロンの個人Wikiから **分散型GAS Wiki** へピボットすることを決定。
-    - オンデマンドのスクレイピングではなく、「Push/Gossip」アーキテクチャ（Nostr/ActivityPubに触発）を採用。
-    - `PLAN.md` にロードマップを策定。
-    - `ARCHITECTURE.md` にアーキテクチャ設計を文書化。
-    - 進捗を追跡するために本ログを作成。
+### External Index システム実装
+
+**目的**: 分散型Wikiネットワークにおいて、外部のWikiを登録・管理するExternal Indexシステムを実装する
+
+#### バックエンド実装
+
+1. **`backend/src/db.ts`**
+   - 重複していた `addExternalWiki` 関数を修正・整理
+   - `removeExternalWiki` 関数を追加
+   - `ExternalWiki` インターフェースを定義
+   - External_Index シートの管理機能を強化
+
+2. **`backend/src/api.ts`**
+   - `GET ?path=external_index` - 外部Wiki一覧取得
+   - `POST ?path=add_external_wiki` - 外部Wiki追加
+   - `POST ?path=remove_external_wiki` - 外部Wiki削除
+
+#### フロントエンド実装
+
+1. **`frontend/src/types.ts`**
+   - `ExternalWiki` インターフェースを追加
+
+2. **`frontend/src/api.ts`**
+   - `getExternalIndex()` - 外部Wiki一覧取得
+   - `addExternalWiki()` - 外部Wiki追加
+   - `removeExternalWiki()` - 外部Wiki削除
+
+3. **`frontend/src/main.ts`**
+   - `externalIndexManagement` Alpine コンポーネントを実装
+   - 外部Wikiの追加・削除・一覧表示機能
+
+4. **`frontend/index.html`**
+   - External Index 管理ページのルーティング追加 (`#/admin/external-index`)
+   - ヘッダーナビゲーションに「External Index」リンクを追加
+
+5. **`frontend/src/pages/ExternalIndexManagement.html`** (新規)
+   - 外部Wikiインデックス管理のUIテンプレート
+
+#### 機能
+
+- 外部Wikiの登録（Wiki ID、タイトル、説明、アクセスURL、タグ）
+- 外部Wikiの削除
+- 外部Wiki一覧の表示
+- 登録日時・更新日時の追跡
+- タグによる分類
+
+#### 動作確認
+
+- devサーバー (`bun run dev`) で動作確認済み
+- ルーティング: `#/admin/external-index`
+- ヘッダーの「External Index」リンクからアクセス可能
+
+---
+
+## 2026-01-17
+
+### Alpine.js への移行
+
+**目的**: React から Alpine.js への移行による、バンドルサイズの削減とコードの簡素化
+
+#### 実装内容
+
+1. **フレームワークの置き換え**
+   - React → Alpine.js 3.14.0
+   - JSX/TSX → HTMLテンプレート + TypeScript
+   - React Router → Hashベースルーティング
+
+2. **コンポーネントの移行**
+   - `homePage`: ページ一覧（検索、タグフィルター）
+   - `pageView`: ページ表示（Markdownレンダリング、バージョン履歴）
+   - `pageEditor`: ページ作成・編集（プレビュー機能）
+   - `brokenLinksAdmin`: リンク切れ管理
+   - `orphanedPagesAdmin`: 孤立ページ管理
+   - `statsAdmin`: 統計ダッシュボード
+   - `peerManagement`: ピア管理
+
+3. **状態管理**
+   - Alpine ストアによるテーマ管理（ダーク/ライトモード）
+
+4. **結果**
+   - コード量: 45% 削減
+   - バンドルサイズ: 15KB → 130KB (React時) から 15KB (Alpine.js) へ大幅削減
+
+#### 動作確認
+
+- すべてのページで正常に動作することを確認
+- ルーティング、テーマ切り替え、ページ作成・編集・削除が正常に動作
+
+---
+
+### 連合機能インフラの実装
+
+**目的**: 分散型Wikiのためのピア管理機能を実装
+
+#### 実装内容
+
+1. **バックエンド**
+   - `Peer` 型の定義
+   - `getPeers()`, `addPeer()`, `removePeer()` API
+   - `Peers` シートでのピア情報管理
+
+2. **フロントエンド**
+   - `peerManagement` Alpine コンポーネント
+   - ピア一覧表示、追加、削除機能
+   - 同期ステータスの表示
+
+---
+
+### HTMLテンプレートの実装
+
+**目的**: Alpine.js 用の完全なHTMLテンプレートを実装
+
+#### 実装内容
+
+- すべてのページのHTMLテンプレートを `index.html` に追加
+- ローディング状態、エラーハンドリング、ダークモード対応
+- 日本語UI
+
+---
+
+### ルーティング修正
+
+**目的**: Hashベースルーティングの問題を修正
+
+#### 修正内容
+
+- `parseRoute` の先頭スラッシュ処理を修正
+- `startsWith` を使用したルーティング条件の改善
+- カスタム `route-change` イベントの実装
+
+---
+
+### コードの簡素化
+
+**目的**: 共通ユーティリティの抽出によるコード削減
+
+#### 実装内容
+
+- `formatDate`, `renderMarkdown`, `getErrorMessage` を共通化
+- 型アノテーションの追加
+- アクセシビリティの改善（aria-label）
+
+---
+
+### ドキュメント更新
+
+**目的**: Alpine.js 移行に伴うドキュメントの更新
+
+#### 実装内容
+
+- MIT LICENSE の追加
+- README.md の更新（Alpine.js ベースに）
+- README.ja.md の更新（日本語版）
+- プロジェクト構造の更新
+- テックスタックの更新
+
+---
+
+## 2025-12-01
+
+### バージョン履歴機能
+
+- ページのバージョン履歴管理機能を追加
+- （UI実装はWIP）
+
+---
+
+## 2025-11-30
+
+### プロジェクト初期セットアップ
+
+- リポジトリの初期化
+- 基本プロジェクト構造の作成
+
+### 検索機能と自動ページ作成
+
+- ページ検索機能の実装
+- 存在しないページへのリンクから自動作成機能
+
+### ダーク/ライトテーマ切り替え
+
+- テーマ切り替え機能の実装
+- Tailwind CSS ダークモード対応
+
+### タグ機能
+
+- ページタグの追加
+- タグによるフィルタリング
+
+### バックリンク機能
+
+- ページへのリンク元を表示するバックリンク機能
+- Wikiリンク `[PageTitle]` のパース
+
+### サイドバーの追加
+
+- 最近の更新
+- タグ一覧
+- フィード
+- 管理ページへのリンク

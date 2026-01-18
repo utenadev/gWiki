@@ -11,6 +11,8 @@ export interface PageVersion {
 
 export interface WikiPage {
     id: string;
+    path: string;
+    policyId: string;
     title: string;
     content: string;
     tags?: string[];
@@ -30,6 +32,16 @@ export interface Peer {
     name: string;
     isActive: boolean;
     lastSyncedAt?: string;
+}
+
+export interface ExternalWiki {
+    wikiId: string;
+    title: string;
+    description: string;
+    accessUrl: string;
+    registeredAt: string;
+    updatedAt: string;
+    tags: string;
 }
 
 export interface ApiResponse<T> {
