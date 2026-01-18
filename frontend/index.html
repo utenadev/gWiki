@@ -87,7 +87,13 @@
                 <template x-if="pages.length > 0">
                   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <template x-for="page in pages" :key="page.id">
-                      <a :href="'#/page/' + page.id" @click.prevent="navigate('page/' + page.id)" class="block bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow p-6">
+                      <a :href="'#/page/' + page.id" @click.prevent="navigate('page/' + page.id)" class="block bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 relative">
+                        <!-- External Page Badge -->
+                        <template x-if="page.origin">
+                          <span class="absolute top-4 right-4 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full font-semibold">
+                            外部
+                          </span>
+                        </template>
                         <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2" x-text="page.title"></h3>
                         <p class="text-gray-600 dark:text-gray-400 text-sm mb-4" x-text="page.content.substring(0, 100) + '...'"></p>
                         <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-500">
@@ -152,6 +158,18 @@
                 <!-- Page Content -->
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
                   <h1 class="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4" x-text="page.title"></h1>
+
+                  <!-- Origin/Author Info for External Pages -->
+                  <template x-if="page.origin">
+                    <div class="mb-4 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div class="flex items-center space-x-2 text-sm">
+                        <span>🌐</span>
+                        <span class="text-blue-800 dark:text-blue-300">外部ページ</span>
+                        <span class="text-gray-400">•</span>
+                        <span class="text-blue-700 dark:text-blue-400" x-text="'From: ' + (page.author || page.origin)"></span>
+                      </div>
+                    </div>
+                  </template>
 
                   <div class="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400 mb-4">
                     <span class="flex items-center space-x-1">
@@ -321,7 +339,7 @@
         </template>
 
         <!-- New Page -->
-        <template x-if="route === 'new'">
+        <template x-if="route.startsWith('new')">
           <div x-data="pageEditor()">
             <template x-if="loading">
               <div class="flex items-center justify-center py-12">
@@ -965,5 +983,26 @@
     </div>
 
     <script type="module" src="/src/main.ts"></script>
+
+    <!-- WikiLink Click Handler -->
+    <script>
+      document.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-wiki-link]')
+        if (target) {
+          e.preventDefault()
+          const href = target.getAttribute('href')
+          const origin = target.getAttribute('data-origin')
+
+          if (origin) {
+            // External wiki link - not implemented yet
+            alert(`外部Wikiのリンクはまだ実装されていません。\nOrigin: ${origin}`)
+          } else {
+            // Local wiki link - navigate to the page
+            const hash = href.startsWith('#') ? href : '#/' + href
+            location.hash = hash
+          }
+        }
+      })
+    </script>
   </body>
 </html>

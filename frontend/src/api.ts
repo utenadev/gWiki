@@ -13,6 +13,8 @@ const mockPeers: Peer[] = [];
 const mockPages: WikiPage[] = [
     {
         id: '1',
+        path: 'welcome',
+        policyId: 'public',
         title: 'gWikiへようこそ',
         content: '# gWikiへようこそ\n\n**Google Apps Script**と**Google Spreadsheet**で動作する、モダンなWikiアプリケーションです。\n\n## 機能\n\n- 📝 Markdownでページを作成・編集\n- 🎨 Tailwind CSSによる美しいモダンUI\n- ⚡ 高速でレスポンシブ\n- 🔗 Wikiリンク - [ページタイトル] で他のページにリンク\n\n## はじめに\n\n「新規ページ」ボタンをクリックして、最初のWikiページを作成しましょう！\n\n書式のヒントは [Markdown ガイド] を、実例は [テストページ] をご覧ください。',
         tags: ['welcome', 'guide', 'introduction'],
@@ -21,6 +23,8 @@ const mockPages: WikiPage[] = [
     },
     {
         id: '2',
+        path: 'guide/markdown',
+        policyId: 'public',
         title: 'Markdown ガイド',
         content: '# Markdown ガイド\n\n## 見出し\n\n# 見出し1\n## 見出し2\n### 見出し3\n\n## 強調\n\n*斜体* または _斜体_\n**太字** または __太字__\n\n## Wikiリンク\n\n[ページタイトル] という記法で、他のWikiページにリンクできます。\n\n例: [gWikiへようこそ] や [テストページ]',
         tags: ['markdown', 'guide', 'syntax'],
@@ -29,6 +33,8 @@ const mockPages: WikiPage[] = [
     },
     {
         id: '3',
+        path: 'test',
+        policyId: 'public',
         title: 'テストページ',
         content: '# テストページ\n\nWikiリンク機能を実演するためのテストページです。\n\n## 関連ページ\n\n- [gWikiへようこそ] - メインのウェルカムページ\n- [Markdown ガイド] - Markdown記法について学ぶ',
         tags: ['test', 'demo', 'wiki-link'],
@@ -125,6 +131,8 @@ class WikiApi {
             return Promise.resolve(
                 page.versions.map((v) => ({
                     id,
+                    path: page.path,
+                    policyId: page.policyId,
                     title: page.title,
                     content: v.content,
                     createdAt: v.updatedAt,
@@ -152,6 +160,8 @@ class WikiApi {
         if (USE_MOCK) {
             const newPage: WikiPage = {
                 id: String(mockPages.length + 1),
+                path: title.toLowerCase().replace(/\s+/g, '-'),
+                policyId: 'public',
                 title,
                 content,
                 tags,
@@ -200,6 +210,8 @@ class WikiApi {
 
             mockPages[index] = {
                 ...currentPage,
+                path: currentPage.path,
+                policyId: currentPage.policyId,
                 title,
                 content,
                 tags,

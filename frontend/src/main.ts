@@ -10,8 +10,83 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('ja-JP')
 }
 
-async function renderMarkdown(content: string): Promise<string> {
-  return await marked.parse(content)
+// WikiLink data structure
+interface WikiLink {
+  title: string
+  origin?: string // External wiki origin (e.g., "https://...")
+  exists: boolean
+}
+
+// Parse WikiLink from content: [Title] or [Origin/Title]
+function parseWikiLinks(content: string, allPages: Page[]): { content: string, links: WikiLink[] } {
+  const wikiLinkRegex = /\[([^\]]+)\]/g
+  const links: WikiLink[] = []
+  let lastIndex = 0
+  let parsedContent = ''
+
+  let match
+  while ((match = wikiLinkRegex.exec(content)) !== null) {
+    // Add content before the link
+    parsedContent += content.substring(lastIndex, match.index)
+
+    const linkText = match[1]
+    const parts = linkText.split('/')
+    let title: string
+    let origin: string | undefined
+
+    if (parts.length > 1) {
+      // External wiki link: [Origin/Title] or [https://.../Title]
+      const possibleOrigin = parts[0]
+      if (possibleOrigin.startsWith('http')) {
+        origin = possibleOrigin
+        title = parts.slice(1).join('/')
+      } else {
+        // Treat as part of title (e.g. [Admin/Settings] is a path, not external wiki)
+        title = linkText
+      }
+    } else {
+      // Local link: [Title]
+      title = linkText
+    }
+
+    // Check if page exists (local or cached)
+    const localPage = allPages.find(p => p.title === title && !p.origin)
+    const cachedPage = allPages.find(p => p.title === title && p.origin)
+
+    const exists = !!(localPage || cachedPage)
+
+    links.push({ title, origin, exists })
+
+    // Generate wiki link HTML
+    const cssClass = exists ? 'wiki-link-exists' : 'wiki-link-missing'
+    const originAttr = origin ? ` data-origin="${origin}"` : ''
+    const dataTitle = origin ? ` title="外部Wiki: ${origin}"` : ''
+
+    // Use page ID if exists, otherwise link to new page with pre-filled title
+    let href: string
+    if (localPage) {
+      href = `#/page/${localPage.id}`
+    } else if (cachedPage) {
+      href = `#/page/${cachedPage.id}`
+    } else {
+      href = `#/new?title=${encodeURIComponent(title)}`
+    }
+
+    parsedContent += `<a href="${href}" ${originAttr} ${dataTitle} class="wiki-link ${cssClass}" data-wiki-link>${linkText}</a>`
+
+    lastIndex = wikiLinkRegex.lastIndex
+  }
+
+  // Add remaining content
+  parsedContent += content.substring(lastIndex)
+
+  return { content: parsedContent, links }
+}
+
+async function renderMarkdown(content: string, allPages: Page[] = []): Promise<string> {
+  const { content: parsedContent } = parseWikiLinks(content, allPages)
+  const html = await marked.parse(parsedContent)
+  return html
 }
 
 function getErrorMessage(e: unknown): string {
@@ -108,6 +183,7 @@ function pageView(initialPageId: string) {
   return {
     pageId: initialPageId,
     page: null as Page | null,
+    allPages: [] as Page[],
     versions: [] as Page[],
     loading: true,
     error: null as string | null,
@@ -131,6 +207,8 @@ function pageView(initialPageId: string) {
       this.loading = true
       this.error = null
       try {
+        // Load all pages for WikiLink resolution
+        this.allPages = await api.getPages()
         this.page = await api.getPage(this.pageId)
         this.versions = await api.getPageVersions(this.pageId)
       } catch (e) {
@@ -140,7 +218,9 @@ function pageView(initialPageId: string) {
       }
     },
 
-    renderContent: renderMarkdown,
+    renderContent(content: string) {
+      return renderMarkdown(content, this.allPages)
+    },
     formatDate,
     toggleVersions() {
       this.showingVersions = !this.showingVersions
@@ -185,6 +265,14 @@ function pageEditor(pageId?: string) {
           this.error = getErrorMessage(e)
         } finally {
           this.loading = false
+        }
+      } else {
+        // New page: check for title in URL params
+        const hash = location.hash
+        const urlParams = new URLSearchParams(hash.split('?')[1])
+        const titleParam = urlParams.get('title')
+        if (titleParam) {
+          this.title = decodeURIComponent(titleParam)
         }
       }
     },
