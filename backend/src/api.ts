@@ -1,6 +1,6 @@
-/**
- * API endpoints for the wiki application
- */
+import { DB, WikiPage } from './db';
+
+const db = new DB();
 
 /**
  * Handle GET requests
@@ -14,22 +14,21 @@ function doGet(e: GoogleAppsScript.Events.DoGet): GoogleAppsScript.Content.TextO
     try {
         switch (path) {
             case 'pages':
-                // Return both local and cached pages for now, or just local?
-                // Let's return local + cached so frontend sees everything.
-                const localPages = getAllPages();
-                const cachedPages = getAllCachedPages();
+                // Return both local and cached pages
+                const localPages = db.getAllPages();
+                const cachedPages = db.getAllCachedPages();
                 response = { success: true, data: [...localPages, ...cachedPages] };
                 break;
             case 'page':
                 if (!id) {
                     response = { success: false, error: 'ID is required' };
                 } else {
-                    const page = getPageById(id);
+                    const page = db.getPageById(id);
                     if (page) {
                         response = { success: true, data: page };
                     } else {
                         // Check cache if not found locally
-                        const cached = getAllCachedPages().find(p => p.id === id);
+                        const cached = db.getAllCachedPages().find(p => p.id === id);
                         if (cached) {
                             response = { success: true, data: cached };
                         } else {
@@ -39,10 +38,10 @@ function doGet(e: GoogleAppsScript.Events.DoGet): GoogleAppsScript.Content.TextO
                 }
                 break;
             case 'peers':
-                response = { success: true, data: getPeers() };
+                response = { success: true, data: db.getPeers() };
                 break;
             case 'external_index':
-                response = { success: true, data: getExternalIndex() };
+                response = { success: true, data: db.getExternalIndex() };
                 break;
             default:
                 response = { success: false, error: 'Invalid endpoint' };
@@ -71,7 +70,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 if (!body.title || !body.content) {
                     response = { success: false, error: 'Title and content are required' };
                 } else {
-                    const page = createPage(body.title, body.content);
+                    const page = db.createPage(body.title, body.content, body.tags || [], body.path || '');
                     // Broadcast to peers
                     broadcastToPeers(page);
                     response = { success: true, data: page };
@@ -81,7 +80,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 if (!body.id || !body.title || !body.content) {
                     response = { success: false, error: 'ID, title, and content are required' };
                 } else {
-                    const page = updatePage(body.id, body.title, body.content);
+                    const page = db.updatePage(body.id, body.title, body.content, body.tags || []);
                     if (page) {
                         // Broadcast to peers
                         broadcastToPeers(page);
@@ -95,7 +94,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 if (!body.id) {
                     response = { success: false, error: 'ID is required' };
                 } else {
-                    const deleted = deletePage(body.id);
+                    const deleted = db.deletePage(body.id);
                     response = { success: deleted, data: { deleted } };
                 }
                 break;
@@ -105,9 +104,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                     response = { success: false, error: 'Page data required' };
                 } else {
                     const page = body.page as WikiPage;
-                    // Validate: In real world, check signature or if peer is trusted
-                    // For now, just save it
-                    upsertCachedPage(page);
+                    db.upsertCachedPage(page);
                     response = { success: true, message: 'Gossip received' };
                 }
                 break;
@@ -115,7 +112,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 if(!body.url || !body.name) {
                     response = { success: false, error: 'URL and Name required' };
                 } else {
-                    const peer = addPeer(body.url, body.name);
+                    const peer = db.addPeer(body.url, body.name);
                     response = { success: true, data: peer };
                 }
                 break;
@@ -123,7 +120,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 if(!body.wikiId || !body.title || !body.accessUrl) {
                     response = { success: false, error: 'WikiID, Title, and AccessURL are required' };
                 } else {
-                    const added = addExternalWiki(body.wikiId, body.title, body.description || '', body.accessUrl, body.tags || '');
+                    const added = db.addExternalWiki(body.wikiId, body.title, body.description || '', body.accessUrl, body.tags || '');
                     response = { success: added };
                 }
                 break;
@@ -131,7 +128,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 if(!body.accessUrl) {
                     response = { success: false, error: 'AccessURL is required' };
                 } else {
-                    const removed = removeExternalWiki(body.accessUrl);
+                    const removed = db.removeExternalWiki(body.accessUrl);
                     response = { success: removed };
                 }
                 break;
@@ -150,7 +147,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
  * Broadcast updates to all known peers
  */
 function broadcastToPeers(page: WikiPage): void {
-    const peers = getPeers();
+    const peers = db.getPeers();
     if (peers.length === 0) return;
 
     let myUrl = '';

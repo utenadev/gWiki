@@ -1,55 +1,116 @@
 version: '3'
 
 vars:
-  FRONTEND_DIR: "./frontend"
+  FRONTEND_DIR: frontend
+  BACKEND_DIR: backend
 
 tasks:
   default:
     desc: "Show available tasks"
     cmds:
-      - task -l
+      - task --list
 
-  # Development
-  dev:
-    desc: "Start development server"
+  # ============================================================================
+  # Install Dependencies
+  # ============================================================================
+  install:
+    desc: "Install all dependencies (root, frontend, backend)"
     cmds:
-      - cd {{.FRONTEND_DIR}} && bun run dev
+      - bun install
+      - cd {{.FRONTEND_DIR}} && bun install
+      - cd {{.BACKEND_DIR}} && bun install
 
-  # Build
+  # ============================================================================
+  # Quality Assurance
+  # ============================================================================
+  check:
+    desc: "Run type checking for frontend and backend"
+    cmds:
+      - task: "check:frontend"
+      - task: "check:backend"
+
+  check:frontend:
+    desc: "Type check frontend"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - bun x tsc --noEmit
+      - echo "✅ Frontend type check passed"
+
+  check:backend:
+    desc: "Type check backend"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - bun x tsc --noEmit
+      - echo "✅ Backend type check passed"
+
+  test:
+    desc: "Run all tests"
+    cmds:
+      - task: "test:backend"
+
+  test:backend:
+    desc: "Run backend tests with mock GAS environment"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - bun test
+
+  # ============================================================================
+  # Frontend Development
+  # ============================================================================
+  dev:
+    desc: "Start frontend development server"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - bun run dev
+
   build:
     desc: "Build frontend for production"
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
-      - cd {{.FRONTEND_DIR}} && bun run build
+      - bun run build
 
   preview:
     desc: "Preview production build"
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
-      - cd {{.FRONTEND_DIR}} && bun run preview
+      - bun run preview
 
-  # Backend deployment
+  # ============================================================================
+  # Backend Development (GAS)
+  # ============================================================================
+  backend:build:
+    desc: "Build backend code"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - bun run build
+
   backend:push:
     desc: "Push backend code to GAS"
+    dir: "{{.BACKEND_DIR}}"
     cmds:
-      - cd backend && clasp push
+      - clasp push
 
   backend:deploy:
     desc: "Deploy backend as Web App"
+    dir: "{{.BACKEND_DIR}}"
     cmds:
-      - cd backend && clasp deploy
+      - clasp deploy
 
   backend:open:
     desc: "Open GAS editor in browser"
+    dir: "{{.BACKEND_DIR}}"
     cmds:
-      - cd backend && clasp open
+      - clasp open
 
-  # Install dependencies
-  install:
-    desc: "Install dependencies"
-    cmds:
-      - bun install
-
-  # Short aliases
+  # ============================================================================
+  # Short Aliases
+  # ============================================================================
   b:
     desc: "Alias for build"
     cmds:
-      - task build
+      - task: build
+
+  p:
+    desc: "Alias for backend:push"
+    cmds:
+      - task: "backend:push"

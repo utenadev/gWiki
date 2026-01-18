@@ -11,6 +11,8 @@ export interface PageVersion {
 
 export interface WikiPage {
     id: string;
+    path: string;
+    policyId: string;
     title: string;
     content: string;
     tags?: string[];
