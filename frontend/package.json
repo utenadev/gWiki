@@ -15,6 +15,7 @@
     },
     "devDependencies": {
         "@rollup/rollup-linux-x64-gnu": "^4.55.1",
+        "@tailwindcss/typography": "^0.5.19",
         "@types/alpinejs": "^3.13.11",
         "@types/diff": "^8.0.0",
         "autoprefixer": "^10.4.16",

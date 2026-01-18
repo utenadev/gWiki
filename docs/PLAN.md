@@ -52,3 +52,96 @@ Google Apps Script (GAS) と Google Spreadsheets を使用した、分散型（�
 
 ## Phase 4: リレーノード
 - [ ] フロントエンドUIを持たず、メッセージの保存と転送のみを行い、コミュニティのハブとして機能する特化型「リレー」モードを作成する。
+## Phase 5: Google Drive API based Wiki (2025-01-17) 🆕 NEW!
+
+### 新規アーキテクチャ: Google Drive API を活用したWiki システムを実装する
+
+### 目標
+Google Drive 上の SpreadSheet ファイルを Wiki として管理するシステムを実装する
+- パターン1: ローカルWiki（個人利用）
+- パターン2: Workspace 共有（Google Workspace ドメイン内共有）
+- パターン3: インターネット共有 + 外部 INDEX
+
+### データフロー
+```
+Google Drive
+├── my-wiki.ods (個人Wiki)
+└─ Shared Drive/
+    └─ team-wiki.ods (Workspace 共有)
+      ↓ URLで読み込み
+   [GAS - 行単位読み込み + レンダリング]
+      ↓
+   HTMLを返す
+```
+
+### ACL 取り扱い
+- Google Drive の共有設定をそのまま使用
+- 個人Wiki: 自分のみ read/write
+- 共有Wiki: ACL 設設定に従う（read only、編集可、非公開）
+- アクセス権限エラーを適切にハンドリング
+
+### 外部 INDEX システム（Nostrリレーレーバー風）
+
+#### External_Index シート構造
+```
+External_Index シート
+├── wiki_id
+├── title
+├── description
+├── access_url
+├── registered_at
+├── updated_at
+└── is_public
+```
+
+### 外部INDEXの更新フロー
+```
+ページ表示時:
+1. そのWikiの外部INDEXを検索
+2. 登録されていればキャッシュを使う
+3. されているいなければ、直接URLを開いて表示
+4. 自分の外部INDEXに登録するか確認
+```
+
+### 実装方針
+
+#### Google Drive API と OAuth2 の有無
+- **必要ない**
+- `SpreadsheetApp.openByUrl()` で十分
+- ACL は Google Drive の共有設定をそのまま活用
+
+#### 実装に追加する機能
+- Wiki 選択 UI（どのWikiを開くかを選択）
+- 外部 INDEX 管理（外部 Wiki の登録・更新）
+- すべて URL ベースで SpreadSheet を開いてレンダリング
+- ACL エラーハンドリング
+
+### 注意点
+
+- 既存の P2P Gossip プロトコルは維持（パターン3用プラグインとして実装済み）
+- 既存 SpreadSheet DB 実装は残す（バックアップ、比較用）
+- 既存の機能を維持しつつつつ新しい機能を追加
+- Google Workspace 環境でのみ動作する機能を明確にする
+
+### 実装ステップ
+
+### Step 1: 基礎実装
+- 外部 INDEX シートの作成
+- URL 経由のデータ読み込み
+- ACL チ強
+
+### Step 2: Wiki 選択 UI 実装
+- 複数の Wiki 一覧表示
+- URL 入力によるWiki選択
+- 複数の Wiki 1.25 個速の更新
+
+### Step 3: テスト実装
+- Google Workspace テスト
+- Google Drive テスト
+- ACL テスト
+
+## 注意点
+
+- 既存の P2P Gossip プロトコルは維持（パターン3 用プラグインとして実装済み）
+- 既存 SpreadSheet DB 実装は残す（バックアップ、比較用）
+- Google Workspace 環境でのみ動作する機能を明確にする

@@ -1,0 +1,55 @@
+version: '3'
+
+vars:
+  FRONTEND_DIR: "./frontend"
+
+tasks:
+  default:
+    desc: "Show available tasks"
+    cmds:
+      - task -l
+
+  # Development
+  dev:
+    desc: "Start development server"
+    cmds:
+      - cd {{.FRONTEND_DIR}} && bun run dev
+
+  # Build
+  build:
+    desc: "Build frontend for production"
+    cmds:
+      - cd {{.FRONTEND_DIR}} && bun run build
+
+  preview:
+    desc: "Preview production build"
+    cmds:
+      - cd {{.FRONTEND_DIR}} && bun run preview
+
+  # Backend deployment
+  backend:push:
+    desc: "Push backend code to GAS"
+    cmds:
+      - cd backend && clasp push
+
+  backend:deploy:
+    desc: "Deploy backend as Web App"
+    cmds:
+      - cd backend && clasp deploy
+
+  backend:open:
+    desc: "Open GAS editor in browser"
+    cmds:
+      - cd backend && clasp open
+
+  # Install dependencies
+  install:
+    desc: "Install dependencies"
+    cmds:
+      - bun install
+
+  # Short aliases
+  b:
+    desc: "Alias for build"
+    cmds:
+      - task build

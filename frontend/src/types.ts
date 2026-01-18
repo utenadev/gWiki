@@ -32,6 +32,16 @@ export interface Peer {
     lastSyncedAt?: string;
 }
 
+export interface ExternalWiki {
+    wikiId: string;
+    title: string;
+    description: string;
+    accessUrl: string;
+    registeredAt: string;
+    updatedAt: string;
+    tags: string;
+}
+
 export interface ApiResponse<T> {
     success: boolean;
     data?: T;

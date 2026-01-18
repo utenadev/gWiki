@@ -1,6 +1,6 @@
 import Alpine from 'alpinejs'
 import { marked } from 'marked'
-import type { Page, Peer, ApiError } from './types'
+import type { Page, Peer, ExternalWiki, ApiError } from './types'
 import { api } from './api'
 
 // ========================================
@@ -373,6 +373,102 @@ function peerManagement() {
   }
 }
 
+// ========================================
+// External Index Management
+// ========================================
+function externalIndexManagement() {
+  return {
+    externalWikis: [] as ExternalWiki[],
+    loading: true,
+    error: null as string | null,
+    showAddForm: false,
+    newWikiId: '',
+    newTitle: '',
+    newDescription: '',
+    newAccessUrl: '',
+    newTags: '',
+
+    async init() {
+      try {
+        this.externalWikis = await api.getExternalIndex()
+      } catch (e) {
+        this.error = getErrorMessage(e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async addExternalWiki() {
+      if (!this.newWikiId.trim() || !this.newTitle.trim() || !this.newAccessUrl.trim()) {
+        this.error = 'WikiID, Title, and AccessURL are required'
+        return
+      }
+
+      this.loading = true
+      this.error = null
+
+      try {
+        const success = await api.addExternalWiki(
+          this.newWikiId,
+          this.newTitle,
+          this.newDescription,
+          this.newAccessUrl,
+          this.newTags
+        )
+        if (success) {
+          // Reload the list
+          this.externalWikis = await api.getExternalIndex()
+          this.newWikiId = ''
+          this.newTitle = ''
+          this.newDescription = ''
+          this.newAccessUrl = ''
+          this.newTags = ''
+          this.showAddForm = false
+        } else {
+          this.error = 'Failed to add external wiki'
+        }
+      } catch (e) {
+        this.error = getErrorMessage(e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async removeExternalWiki(accessUrl: string) {
+      if (!confirm('Remove this external wiki?')) return
+
+      this.loading = true
+      try {
+        const success = await api.removeExternalWiki(accessUrl)
+        if (success) {
+          this.externalWikis = this.externalWikis.filter(w => w.accessUrl !== accessUrl)
+        } else {
+          this.error = 'Failed to remove external wiki'
+        }
+      } catch (e) {
+        this.error = getErrorMessage(e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    formatDate(dateStr?: string): string {
+      return dateStr ? formatDate(dateStr) : 'Never'
+    },
+
+    toggleAddForm() {
+      this.showAddForm = !this.showAddForm
+      if (!this.showAddForm) {
+        this.newWikiId = ''
+        this.newTitle = ''
+        this.newDescription = ''
+        this.newAccessUrl = ''
+        this.newTags = ''
+      }
+    }
+  }
+}
+
 // Register Alpine components
 Alpine.data('wikiApp', wikiApp)
 Alpine.data('homePage', homePage)
@@ -382,6 +478,7 @@ Alpine.data('brokenLinksAdmin', brokenLinksAdmin)
 Alpine.data('orphanedPagesAdmin', orphanedPagesAdmin)
 Alpine.data('statsAdmin', statsAdmin)
 Alpine.data('peerManagement', peerManagement)
+Alpine.data('externalIndexManagement', externalIndexManagement)
 
 // Start Alpine
 Alpine.start()
@@ -395,5 +492,6 @@ export {
   brokenLinksAdmin,
   orphanedPagesAdmin,
   statsAdmin,
-  peerManagement
+  peerManagement,
+  externalIndexManagement
 }
