@@ -2,10 +2,20 @@
  * API client for interacting with the backend
  */
 
-import type { WikiPage, ApiResponse, PageVersion, Peer, ExternalWiki } from './types';
+import type { WikiPage, ApiResponse, PageVersion, Peer, ExternalWiki, WikiMetadata } from './types';
+import { WikiMode } from './types';
 
 // For development, use mock data
 const USE_MOCK = true;
+
+// Current wiki ID (stored in localStorage)
+const getCurrentWikiId = (): string => {
+    return localStorage.getItem('currentWikiId') || 'wiki-default';
+};
+
+const setCurrentWikiId = (wikiId: string): void => {
+    localStorage.setItem('currentWikiId', wikiId);
+};
 
 // Mock data for development
 const mockPeers: Peer[] = [];
@@ -45,9 +55,38 @@ const mockPages: WikiPage[] = [
 
 class WikiApi {
     private baseUrl: string;
+    private wikiId: string;
 
-    constructor(baseUrl: string = '') {
+    constructor(baseUrl: string = '', wikiId?: string) {
         this.baseUrl = baseUrl;
+        this.wikiId = wikiId || getCurrentWikiId();
+    }
+
+    /**
+     * Set the current wiki ID
+     */
+    setWikiId(wikiId: string): void {
+        this.wikiId = wikiId;
+        setCurrentWikiId(wikiId);
+    }
+
+    /**
+     * Get the current wiki ID
+     */
+    getWikiId(): string {
+        return this.wikiId;
+    }
+
+    /**
+     * Build URL with wikiId parameter
+     */
+    private buildUrl(path: string, extraParams: Record<string, string> = {}): string {
+        const params = new URLSearchParams({
+            path,
+            wikiId: this.wikiId,
+            ...extraParams
+        });
+        return `${this.baseUrl}?${params.toString()}`;
     }
 
     /**
@@ -65,7 +104,7 @@ class WikiApi {
             return Promise.resolve(mockPages);
         }
 
-        const response = await fetch(`${this.baseUrl}?path=pages`);
+        const response = await fetch(this.buildUrl('pages'));
         const data: ApiResponse<WikiPage[]> = await response.json();
 
         if (!data.success) {
@@ -94,7 +133,7 @@ class WikiApi {
             return Promise.resolve(mockPages.find(p => p.id === id) || null);
         }
 
-        const response = await fetch(`${this.baseUrl}?path=page&id=${id}`);
+        const response = await fetch(this.buildUrl('page', { id }));
         const data: ApiResponse<WikiPage> = await response.json();
 
         if (!data.success) {
@@ -172,7 +211,7 @@ class WikiApi {
             return Promise.resolve(newPage);
         }
 
-        const response = await fetch(`${this.baseUrl}?path=create`, {
+        const response = await fetch(this.buildUrl('create'), {
             method: 'POST',
             body: JSON.stringify({ title, content, tags }),
         });
@@ -221,7 +260,7 @@ class WikiApi {
             return Promise.resolve(mockPages[index]);
         }
 
-        const response = await fetch(`${this.baseUrl}?path=update`, {
+        const response = await fetch(this.buildUrl('update'), {
             method: 'POST',
             body: JSON.stringify({ id, title, content, tags }),
         });
@@ -247,7 +286,7 @@ class WikiApi {
             return Promise.resolve(true);
         }
 
-        const response = await fetch(`${this.baseUrl}?path=delete`, {
+        const response = await fetch(this.buildUrl('delete'), {
             method: 'POST',
             body: JSON.stringify({ id }),
         });
@@ -536,11 +575,112 @@ class WikiApi {
             return Promise.resolve(true);
         }
 
-        const response = await fetch(`${this.baseUrl}?path=remove_external_wiki`, {
+        const response = await fetch(this.buildUrl('remove_external_wiki'), {
             method: 'POST',
             body: JSON.stringify({ accessUrl }),
         });
         const data: ApiResponse<unknown> = await response.json();
+
+        return data.success;
+    }
+
+    // --- Wiki Management ---
+
+    /**
+     * Get all registered wikis
+     */
+    async getAllWikis(): Promise<WikiMetadata[]> {
+        if (USE_MOCK) {
+            return Promise.resolve([
+                { wikiId: 'wiki-default', title: 'Default Wiki', spreadsheetId: 'mock-spreadsheet-id' }
+            ]);
+        }
+
+        const response = await fetch(this.buildUrl('wikis'));
+        const data: ApiResponse<WikiMetadata[]> = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to get wikis');
+        }
+
+        return data.data || [];
+    }
+
+    /**
+     * Add a new wiki (register existing spreadsheet)
+     */
+    async addWiki(wikiId: string, title: string, spreadsheetId: string): Promise<WikiMetadata | null> {
+        if (USE_MOCK) {
+            return Promise.resolve({ wikiId, title, spreadsheetId });
+        }
+
+        const response = await fetch(this.buildUrl('add_wiki'), {
+            method: 'POST',
+            body: JSON.stringify({ wikiId, title, spreadsheetId }),
+        });
+        const data: ApiResponse<WikiMetadata> = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to add wiki');
+        }
+
+        return data.data || null;
+    }
+
+    /**
+     * Switch to a different wiki
+     */
+    async switchWiki(wikiId: string): Promise<boolean> {
+        if (USE_MOCK) {
+            this.setWikiId(wikiId);
+            return Promise.resolve(true);
+        }
+
+        const response = await fetch(this.buildUrl('switch_wiki'), {
+            method: 'POST',
+            body: JSON.stringify({ wikiId }),
+        });
+        const data: ApiResponse<{ currentWikiId: string }> = await response.json();
+
+        if (data.success && data.data?.currentWikiId) {
+            this.setWikiId(data.data.currentWikiId);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the current wiki mode
+     */
+    async getMode(): Promise<WikiMode> {
+        if (USE_MOCK) {
+            return Promise.resolve(WikiMode.INTERNET);
+        }
+
+        const response = await fetch(this.buildUrl('mode'));
+        const data: ApiResponse<{ mode: string }> = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to get mode');
+        }
+
+        return (data.data?.mode === 'workspace' ? WikiMode.WORKSPACE : WikiMode.INTERNET);
+    }
+
+    /**
+     * Set wiki mode
+     */
+    async setMode(mode: WikiMode): Promise<boolean> {
+        if (USE_MOCK) {
+            return Promise.resolve(true);
+        }
+
+        const response = await fetch(this.buildUrl('set_mode'), {
+            method: 'POST',
+            body: JSON.stringify({ mode }),
+        });
+        const data: ApiResponse<{ mode: string }> = await response.json();
 
         return data.success;
     }

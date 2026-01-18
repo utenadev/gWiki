@@ -1,5 +1,81 @@
 # gWiki 作業ログ
 
+## 2026-01-19
+
+### マルチSpreadSheet対応とWikiセレクターUIの実装
+
+**目的**: 1つのGASプロジェクトで複数のSpreadSheet（Wiki）を扱えるようにし、インターネット共有モードとGoogle Workspaceモードを切り替え可能にする。
+
+#### 設計書の作成
+
+- `.claude/plans/calm-imagining-eclipse.md` に詳細な設計書を作成
+  - 3層データモデル（SpreadSheet、GASバックエンド、HTML画面）の図解
+  - インターネットモードとワークスペースモードの仕様定義
+  - APIエンドポイント設計（`wikiId` パラメータの追加）
+
+#### バックエンド実装 (Phase 1)
+
+1. **`backend/src/db.ts`**
+   - `WikiMode` 列挙型を追加（`INTERNET` / `WORKSPACE`）
+   - `WikiMetadata` インターフェースを追加
+   - `DB` クラスに `wikiId` パラメータを追加
+   - `PropertiesService` で `wikiId → SpreadsheetId` のマッピングを管理（`WIKI_MAP`）
+   - モードに応じたシート構成の自動初期化
+     - `Store_Admin` シートの追加
+     - ワークスペースモード時は `Peers`, `Cache`, `External_Index` を非作成
+   - Wiki管理メソッド: `getAllWikis()`, `addWiki()`, `switchWiki()`, `getMode()`, `setMode()`
+   - インターネットモード専用メソッドにモードチェックを追加
+
+2. **`backend/src/api.ts`**
+   - `wikiId` クエリパラメータの追加
+   - モードチェックの追加（ワークスペースモード時は外部連携を無効化）
+   - Wiki管理エンドポイント: `wikis`, `add_wiki`, `switch_wiki`, `mode`, `set_mode`
+
+3. **`backend/src/Code.ts`**
+   - `getDB()` ヘルパー関数を追加
+
+#### フロントエンド実装 (Phase 3)
+
+1. **`frontend/src/types.ts`**
+   - `WikiMode` 列挙型を追加
+   - `WikiMetadata` インターフェースを追加
+
+2. **`frontend/src/api.ts`**
+   - `wikiId` プロパティの追加とローカルストレージ管理
+   - `buildUrl()` ヘルパーメソッドで `wikiId` を自動付与
+   - Wiki管理メソッド: `getAllWikis()`, `addWiki()`, `switchWiki()`, `getMode()`, `setMode()`
+
+3. **`frontend/src/main.ts`**
+   - `wikiSelector` Alpine.js コンポーネントを実装
+   - Wiki切り替え、新規Wiki追加機能
+
+4. **`frontend/index.html`**
+   - ヘッダーにWikiセレクターUIを追加（ドロップダウン形式）
+   - 新規Wiki追加フォーム（Wiki ID、タイトル、Spreadsheet ID）
+
+#### 変更ファイル
+
+- `backend/src/db.ts`
+- `backend/src/api.ts`
+- `backend/src/Code.ts`
+- `frontend/src/types.ts`
+- `frontend/src/api.ts`
+- `frontend/src/main.ts`
+- `frontend/index.html`
+
+#### 動作確認
+
+- `bun run build` でビルド成功
+- 型エラーなし
+
+#### 未実装機能
+
+設計書の Phase 2（Google Workspace 内連携）は未実装:
+- Drive API によるドメイン内の gWiki SpreadSheet の自動検出
+- 共有ドライブ上の SpreadSheet の自動登録
+
+---
+
 ## 2026-01-18
 
 ### ドキュメントと実装の同期

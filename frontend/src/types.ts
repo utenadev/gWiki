@@ -2,6 +2,17 @@
  * Type definitions for the application
  */
 
+export enum WikiMode {
+    INTERNET = 'internet',    // Internet sharing mode with gossip protocol
+    WORKSPACE = 'workspace'   // Google Workspace mode (domain-internal only)
+}
+
+export interface WikiMetadata {
+    wikiId: string;
+    title: string;
+    spreadsheetId: string;
+}
+
 export interface PageVersion {
     versionNumber: number;
     content: string;

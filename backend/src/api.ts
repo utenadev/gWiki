@@ -1,14 +1,21 @@
-import { DB, WikiPage } from './db';
+import { DB, WikiPage, WikiMode } from './db';
 
-const db = new DB();
+/**
+ * Get DB instance with wikiId from request parameters
+ */
+function getDBForRequest(wikiId?: string): DB {
+    return new DB(wikiId);
+}
 
 /**
  * Handle GET requests
  */
 function doGet(e: GoogleAppsScript.Events.DoGet): GoogleAppsScript.Content.TextOutput {
     const path = e.parameter.path || '';
+    const wikiId = e.parameter.wikiId;
     const id = e.parameter.id || '';
 
+    const db = getDBForRequest(wikiId);
     let response: any;
 
     try {
@@ -43,6 +50,14 @@ function doGet(e: GoogleAppsScript.Events.DoGet): GoogleAppsScript.Content.TextO
             case 'external_index':
                 response = { success: true, data: db.getExternalIndex() };
                 break;
+            case 'wikis':
+                // Get all registered wikis
+                response = { success: true, data: db.getAllWikis() };
+                break;
+            case 'mode':
+                // Get current wiki mode
+                response = { success: true, data: { mode: db.getMode() } };
+                break;
             default:
                 response = { success: false, error: 'Invalid endpoint' };
         }
@@ -59,7 +74,9 @@ function doGet(e: GoogleAppsScript.Events.DoGet): GoogleAppsScript.Content.TextO
  */
 function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.TextOutput {
     const path = e.parameter.path || '';
+    const wikiId = e.parameter.wikiId;
 
+    const db = getDBForRequest(wikiId);
     let response: any;
 
     try {
@@ -71,8 +88,10 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                     response = { success: false, error: 'Title and content are required' };
                 } else {
                     const page = db.createPage(body.title, body.content, body.tags || [], body.path || '');
-                    // Broadcast to peers
-                    broadcastToPeers(page);
+                    // Broadcast to peers (only in internet mode)
+                    if (db.getMode() === WikiMode.INTERNET) {
+                        broadcastToPeers(page, db);
+                    }
                     response = { success: true, data: page };
                 }
                 break;
@@ -82,8 +101,10 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 } else {
                     const page = db.updatePage(body.id, body.title, body.content, body.tags || []);
                     if (page) {
-                        // Broadcast to peers
-                        broadcastToPeers(page);
+                        // Broadcast to peers (only in internet mode)
+                        if (db.getMode() === WikiMode.INTERNET) {
+                            broadcastToPeers(page, db);
+                        }
                         response = { success: true, data: page };
                     } else {
                         response = { success: false, error: 'Page not found' };
@@ -100,7 +121,9 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 break;
             // Gossip Protocol: Receive updates from other nodes
             case 'gossip':
-                if (!body.page) {
+                if (db.getMode() !== WikiMode.INTERNET) {
+                    response = { success: false, error: 'Gossip protocol is only available in internet mode' };
+                } else if (!body.page) {
                     response = { success: false, error: 'Page data required' };
                 } else {
                     const page = body.page as WikiPage;
@@ -109,7 +132,9 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 }
                 break;
             case 'add_peer':
-                if(!body.url || !body.name) {
+                if (db.getMode() !== WikiMode.INTERNET) {
+                    response = { success: false, error: 'Peer management is only available in internet mode' };
+                } else if(!body.url || !body.name) {
                     response = { success: false, error: 'URL and Name required' };
                 } else {
                     const peer = db.addPeer(body.url, body.name);
@@ -117,7 +142,9 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 }
                 break;
             case 'add_external_wiki':
-                if(!body.wikiId || !body.title || !body.accessUrl) {
+                if (db.getMode() !== WikiMode.INTERNET) {
+                    response = { success: false, error: 'External wiki management is only available in internet mode' };
+                } else if(!body.wikiId || !body.title || !body.accessUrl) {
                     response = { success: false, error: 'WikiID, Title, and AccessURL are required' };
                 } else {
                     const added = db.addExternalWiki(body.wikiId, body.title, body.description || '', body.accessUrl, body.tags || '');
@@ -125,11 +152,45 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
                 }
                 break;
             case 'remove_external_wiki':
-                if(!body.accessUrl) {
+                if (db.getMode() !== WikiMode.INTERNET) {
+                    response = { success: false, error: 'External wiki management is only available in internet mode' };
+                } else if(!body.accessUrl) {
                     response = { success: false, error: 'AccessURL is required' };
                 } else {
                     const removed = db.removeExternalWiki(body.accessUrl);
                     response = { success: removed };
+                }
+                break;
+            case 'add_wiki':
+                // Register a new wiki (existing spreadsheet)
+                if(!body.wikiId || !body.title || !body.spreadsheetId) {
+                    response = { success: false, error: 'WikiID, Title, and SpreadsheetID are required' };
+                } else {
+                    const added = db.addWiki(body.wikiId, body.title, body.spreadsheetId);
+                    if (added) {
+                        response = { success: true, data: added };
+                    } else {
+                        response = { success: false, error: 'Failed to add wiki (may already exist or spreadsheet is not accessible)' };
+                    }
+                }
+                break;
+            case 'switch_wiki':
+                // Switch to a different wiki
+                if(!body.wikiId) {
+                    response = { success: false, error: 'WikiID is required' };
+                } else {
+                    const switched = db.switchWiki(body.wikiId);
+                    response = { success: switched, data: { currentWikiId: body.wikiId } };
+                }
+                break;
+            case 'set_mode':
+                // Set wiki mode
+                if(!body.mode) {
+                    response = { success: false, error: 'Mode is required (internet or workspace)' };
+                } else {
+                    const mode = body.mode === 'workspace' ? WikiMode.WORKSPACE : WikiMode.INTERNET;
+                    db.setMode(mode);
+                    response = { success: true, data: { mode } };
                 }
                 break;
             default:
@@ -146,7 +207,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
 /**
  * Broadcast updates to all known peers
  */
-function broadcastToPeers(page: WikiPage): void {
+function broadcastToPeers(page: WikiPage, db: DB): void {
     const peers = db.getPeers();
     if (peers.length === 0) return;
 
@@ -171,7 +232,7 @@ function broadcastToPeers(page: WikiPage): void {
 
     const requests = peers.map(peer => {
         return {
-            url: `${peer.url}?path=gossip`,
+            url: `${peer.url}?path=gossip&wikiId=${db.getWikiId()}`,
             method: 'post' as const,
             contentType: 'application/json',
             payload: payload,

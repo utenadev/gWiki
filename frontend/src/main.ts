@@ -1,6 +1,6 @@
 import Alpine from 'alpinejs'
 import { marked } from 'marked'
-import type { Page, Peer, ExternalWiki, ApiError } from './types'
+import type { Page, Peer, ExternalWiki, ApiError, WikiMetadata } from './types'
 import { api } from './api'
 
 // ========================================
@@ -557,6 +557,81 @@ function externalIndexManagement() {
   }
 }
 
+// ========================================
+// Wiki Selector
+// ========================================
+function wikiSelector() {
+  return {
+    wikis: [] as WikiMetadata[],
+    currentWikiId: api.getWikiId(),
+    loading: true,
+    showAddForm: false,
+    newWikiId: '',
+    newTitle: '',
+    newSpreadsheetId: '',
+
+    async init() {
+      try {
+        this.wikis = await api.getAllWikis()
+        this.currentWikiId = api.getWikiId()
+      } catch (e) {
+        console.error('Failed to load wikis:', e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async switchWiki(wikiId: string) {
+      if (wikiId === this.currentWikiId) return
+
+      this.loading = true
+      try {
+        const success = await api.switchWiki(wikiId)
+        if (success) {
+          this.currentWikiId = wikiId
+          // Reload page to refresh content
+          location.reload()
+        }
+      } catch (e) {
+        console.error('Failed to switch wiki:', e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async addWiki() {
+      if (!this.newWikiId.trim() || !this.newTitle.trim() || !this.newSpreadsheetId.trim()) {
+        return
+      }
+
+      this.loading = true
+      try {
+        const added = await api.addWiki(this.newWikiId, this.newTitle, this.newSpreadsheetId)
+        if (added) {
+          this.wikis.push(added)
+          this.newWikiId = ''
+          this.newTitle = ''
+          this.newSpreadsheetId = ''
+          this.showAddForm = false
+        }
+      } catch (e) {
+        console.error('Failed to add wiki:', e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    toggleAddForm() {
+      this.showAddForm = !this.showAddForm
+      if (!this.showAddForm) {
+        this.newWikiId = ''
+        this.newTitle = ''
+        this.newSpreadsheetId = ''
+      }
+    }
+  }
+}
+
 // Register Alpine components
 Alpine.data('wikiApp', wikiApp)
 Alpine.data('homePage', homePage)
@@ -567,6 +642,7 @@ Alpine.data('orphanedPagesAdmin', orphanedPagesAdmin)
 Alpine.data('statsAdmin', statsAdmin)
 Alpine.data('peerManagement', peerManagement)
 Alpine.data('externalIndexManagement', externalIndexManagement)
+Alpine.data('wikiSelector', wikiSelector)
 
 // Start Alpine
 Alpine.start()
@@ -581,5 +657,6 @@ export {
   orphanedPagesAdmin,
   statsAdmin,
   peerManagement,
-  externalIndexManagement
+  externalIndexManagement,
+  wikiSelector
 }

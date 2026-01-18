@@ -31,11 +31,106 @@ export interface ExternalWiki {
     tags: string;
 }
 
+/**
+ * Wiki mode enum
+ */
+export enum WikiMode {
+    INTERNET = 'internet',    // Internet sharing mode with gossip protocol
+    WORKSPACE = 'workspace'   // Google Workspace mode (domain-internal only)
+}
+
+/**
+ * Wiki metadata
+ */
+export interface WikiMetadata {
+    wikiId: string;
+    title: string;
+    spreadsheetId: string;
+}
+
 export class DB {
     private ss: GoogleAppsScript.Spreadsheet.Spreadsheet;
+    private wikiId: string;
+    private mode: WikiMode;
 
-    constructor() {
-        this.ss = this.getSpreadsheet();
+    constructor(wikiId?: string) {
+        this.mode = this.getWikiMode();
+        this.wikiId = wikiId || this.getCurrentWikiId();
+        this.ss = this.getSpreadsheet(this.wikiId);
+    }
+
+    /**
+     * Get the current wiki mode
+     */
+    private getWikiMode(): WikiMode {
+        const scriptProperties = PropertiesService.getScriptProperties();
+        const mode = scriptProperties.getProperty('WIKI_MODE');
+        return (mode === 'workspace' ? WikiMode.WORKSPACE : WikiMode.INTERNET);
+    }
+
+    /**
+     * Get the current wiki ID (from PropertiesService or default)
+     */
+    private getCurrentWikiId(): string {
+        const scriptProperties = PropertiesService.getScriptProperties();
+        let currentWikiId = scriptProperties.getProperty('CURRENT_WIKI_ID');
+
+        if (!currentWikiId) {
+            // Create default wiki
+            currentWikiId = 'wiki-default';
+            scriptProperties.setProperty('CURRENT_WIKI_ID', currentWikiId);
+        }
+
+        return currentWikiId;
+    }
+
+    /**
+     * Get wiki map from PropertiesService
+     */
+    private getWikiMap(): Record<string, string> {
+        const scriptProperties = PropertiesService.getScriptProperties();
+        const wikiMapJson = scriptProperties.getProperty('WIKI_MAP');
+        if (!wikiMapJson) return {};
+
+        try {
+            return JSON.parse(wikiMapJson) as Record<string, string>;
+        } catch (e) {
+            console.error('Failed to parse WIKI_MAP:', e);
+            return {};
+        }
+    }
+
+    /**
+     * Set wiki map to PropertiesService
+     */
+    private setWikiMap(wikiMap: Record<string, string>): void {
+        const scriptProperties = PropertiesService.getScriptProperties();
+        scriptProperties.setProperty('WIKI_MAP', JSON.stringify(wikiMap));
+    }
+
+    /**
+     * Get or create the spreadsheet for a specific wiki
+     */
+    private getSpreadsheet(wikiId: string): GoogleAppsScript.Spreadsheet.Spreadsheet {
+        const wikiMap = this.getWikiMap();
+        let spreadsheetId = wikiMap[wikiId];
+
+        if (!spreadsheetId) {
+            // Create new spreadsheet for this wiki
+            const ss = SpreadsheetApp.create(`gWiki: ${wikiId}`);
+            spreadsheetId = ss.getId();
+
+            // Update wiki map
+            wikiMap[wikiId] = spreadsheetId;
+            this.setWikiMap(wikiMap);
+
+            this.initializeSpreadsheet(ss, wikiId);
+            return ss;
+        }
+
+        const ss = SpreadsheetApp.openById(spreadsheetId);
+        this.ensureSheetsExist(ss, this.mode);
+        return ss;
     }
 
     /**
@@ -59,45 +154,67 @@ export class DB {
         return ss;
     }
 
-    private initializeSpreadsheet(ss: GoogleAppsScript.Spreadsheet.Spreadsheet) {
+    private initializeSpreadsheet(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, wikiId: string) {
+        // Clear default sheet
+        const defaultSheet = ss.getActiveSheet();
+        defaultSheet.setName('ToBeDeleted');
+
         // Initialize Pages sheet (Index)
-        // [ID, Path, PolicyID, Title, Created At, Updated At, Tags]
-        const sheet = ss.getActiveSheet();
-        sheet.setName('Pages');
-        sheet.getRange(1, 1, 1, 7).setValues([
+        const pagesSheet = ss.insertSheet('Pages');
+        pagesSheet.getRange(1, 1, 1, 7).setValues([
             ['ID', 'Path', 'PolicyID', 'Title', 'Created At', 'Updated At', 'Tags']
         ]);
-        sheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+        pagesSheet.getRange(1, 1, 1, 7).setFontWeight('bold');
 
         // Initialize Store_Public
         const storePublic = ss.insertSheet('Store_Public');
         storePublic.getRange(1, 1, 1, 2).setValues([['ID', 'Content']]);
         storePublic.getRange(1, 1, 1, 2).setFontWeight('bold');
 
-        // Initialize Peers sheet
-        const peersSheet = ss.insertSheet('Peers');
-        peersSheet.getRange(1, 1, 1, 4).setValues([
-            ['URL', 'Name', 'Is Active', 'Last Synced At']
-        ]);
-        peersSheet.getRange(1, 1, 1, 4).setFontWeight('bold');
+        // Initialize Store_Admin
+        const storeAdmin = ss.insertSheet('Store_Admin');
+        storeAdmin.getRange(1, 1, 1, 2).setValues([['ID', 'Content']]);
+        storeAdmin.getRange(1, 1, 1, 2).setFontWeight('bold');
 
-        // Initialize Cache sheet (for external pages)
-        const cacheSheet = ss.insertSheet('Cache');
-        cacheSheet.getRange(1, 1, 1, 7).setValues([
-            ['ID', 'Title', 'Content', 'Created At', 'Updated At', 'Origin', 'Author']
-        ]);
-        cacheSheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+        // Initialize internet-mode specific sheets
+        if (this.mode === WikiMode.INTERNET) {
+            // Initialize Peers sheet
+            const peersSheet = ss.insertSheet('Peers');
+            peersSheet.getRange(1, 1, 1, 4).setValues([
+                ['URL', 'Name', 'Is Active', 'Last Synced At']
+            ]);
+            peersSheet.getRange(1, 1, 1, 4).setFontWeight('bold');
 
-        // Initialize External_Index sheet
-        const externalIndexSheet = ss.insertSheet('External_Index');
-        externalIndexSheet.getRange(1, 1, 1, 7).setValues([
-            ['WikiID', 'Title', 'Description', 'AccessURL', 'Registered At', 'Updated At', 'Tags']
-        ]);
-        externalIndexSheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+            // Initialize Cache sheet (for external pages)
+            const cacheSheet = ss.insertSheet('Cache');
+            cacheSheet.getRange(1, 1, 1, 7).setValues([
+                ['ID', 'Title', 'Content', 'Created At', 'Updated At', 'Origin', 'Author']
+            ]);
+            cacheSheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+
+            // Initialize External_Index sheet
+            const externalIndexSheet = ss.insertSheet('External_Index');
+            externalIndexSheet.getRange(1, 1, 1, 7).setValues([
+                ['WikiID', 'Title', 'Description', 'AccessURL', 'Registered At', 'Updated At', 'Tags']
+            ]);
+            externalIndexSheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+        }
+
+        // Delete the default sheet
+        try {
+            ss.deleteSheet(defaultSheet);
+        } catch (e) {
+            // Ignore if already deleted
+        }
     }
 
-    private ensureSheetsExist(ss: GoogleAppsScript.Spreadsheet.Spreadsheet) {
-        const requiredSheets = ['Pages', 'Store_Public', 'Peers', 'Cache', 'External_Index'];
+    private ensureSheetsExist(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, mode: WikiMode) {
+        const commonSheets = ['Pages', 'Store_Public', 'Store_Admin'];
+        const internetOnlySheets = ['Peers', 'Cache', 'External_Index'];
+        const requiredSheets = mode === WikiMode.INTERNET
+            ? [...commonSheets, ...internetOnlySheets]
+            : commonSheets;
+
         requiredSheets.forEach(name => {
             if (!ss.getSheetByName(name)) {
                 const sheet = ss.insertSheet(name);
@@ -254,7 +371,7 @@ export class DB {
         for (let i = 1; i < indexData.length; i++) {
             if (indexData[i][0] === id) {
                 const policyId = indexData[i][2];
-                
+
                 // Delete from Store
                 const storeSheet = this.getStoreSheet(policyId);
                 const storeData = storeSheet.getDataRange().getValues();
@@ -273,9 +390,97 @@ export class DB {
         return false;
     }
 
+    // --- Wiki Management ---
+
+    /**
+     * Get all registered wikis
+     */
+    getAllWikis(): WikiMetadata[] {
+        const wikiMap = this.getWikiMap();
+        return Object.entries(wikiMap).map(([wikiId, spreadsheetId]) => ({
+            wikiId,
+            title: wikiId, // For now, title is same as wikiId
+            spreadsheetId
+        }));
+    }
+
+    /**
+     * Add a new wiki (register existing spreadsheet)
+     */
+    addWiki(wikiId: string, title: string, spreadsheetId: string): WikiMetadata | null {
+        const wikiMap = this.getWikiMap();
+
+        // Check if wikiId already exists
+        if (wikiMap[wikiId]) {
+            return null; // Already exists
+        }
+
+        // Verify spreadsheet is accessible
+        try {
+            const ss = SpreadsheetApp.openById(spreadsheetId);
+            this.ensureSheetsExist(ss, this.mode);
+
+            // Add to wiki map
+            wikiMap[wikiId] = spreadsheetId;
+            this.setWikiMap(wikiMap);
+
+            return { wikiId, title, spreadsheetId };
+        } catch (e) {
+            console.error('Failed to add wiki:', e);
+            return null;
+        }
+    }
+
+    /**
+     * Switch to a different wiki (set as current)
+     */
+    switchWiki(wikiId: string): boolean {
+        const wikiMap = this.getWikiMap();
+
+        if (!wikiMap[wikiId]) {
+            return false; // Wiki does not exist
+        }
+
+        const scriptProperties = PropertiesService.getScriptProperties();
+        scriptProperties.setProperty('CURRENT_WIKI_ID', wikiId);
+
+        // Update internal state
+        this.wikiId = wikiId;
+        this.ss = SpreadsheetApp.openById(wikiMap[wikiId]);
+
+        return true;
+    }
+
+    /**
+     * Get the current wiki ID
+     */
+    getWikiId(): string {
+        return this.wikiId;
+    }
+
+    /**
+     * Get the current wiki mode
+     */
+    getMode(): WikiMode {
+        return this.mode;
+    }
+
+    /**
+     * Set wiki mode
+     */
+    setMode(mode: WikiMode): void {
+        const scriptProperties = PropertiesService.getScriptProperties();
+        scriptProperties.setProperty('WIKI_MODE', mode);
+        this.mode = mode;
+    }
+
     // --- Peer Management ---
 
     getPeers(): Peer[] {
+        if (this.mode !== WikiMode.INTERNET) {
+            return []; // Peers are only available in internet mode
+        }
+
         const sheet = this.getSheet('Peers');
         const data = sheet.getDataRange().getValues();
         if (data.length <= 1) return [];
@@ -288,7 +493,11 @@ export class DB {
         }));
     }
 
-    addPeer(url: string, name: string): Peer {
+    addPeer(url: string, name: string): Peer | null {
+        if (this.mode !== WikiMode.INTERNET) {
+            return null; // Peers are only available in internet mode
+        }
+
         const peers = this.getPeers();
         const existing = peers.find(p => p.url === url);
         if (existing) return existing;
@@ -299,6 +508,10 @@ export class DB {
     }
 
     removePeer(url: string): boolean {
+        if (this.mode !== WikiMode.INTERNET) {
+            return false; // Peers are only available in internet mode
+        }
+
         const sheet = this.getSheet('Peers');
         const data = sheet.getDataRange().getValues();
         for (let i = 1; i < data.length; i++) {
@@ -313,6 +526,10 @@ export class DB {
     // --- Cache Management ---
 
     getAllCachedPages(): WikiPage[] {
+        if (this.mode !== WikiMode.INTERNET) {
+            return []; // Cache is only available in internet mode
+        }
+
         const sheet = this.getSheet('Cache');
         const data = sheet.getDataRange().getValues();
         if (data.length <= 1) return [];
@@ -331,6 +548,10 @@ export class DB {
     }
 
     upsertCachedPage(page: WikiPage): boolean {
+        if (this.mode !== WikiMode.INTERNET) {
+            return false; // Cache is only available in internet mode
+        }
+
         const sheet = this.getSheet('Cache');
         const data = sheet.getDataRange().getValues();
         
@@ -363,6 +584,10 @@ export class DB {
     // --- External Index ---
 
     getExternalIndex(): ExternalWiki[] {
+        if (this.mode !== WikiMode.INTERNET) {
+            return []; // External index is only available in internet mode
+        }
+
         const sheet = this.getSheet('External_Index');
         const data = sheet.getDataRange().getValues();
         if (data.length <= 1) return [];
@@ -379,6 +604,10 @@ export class DB {
     }
 
     addExternalWiki(wikiId: string, title: string, description: string, accessUrl: string, tags: string = ''): boolean {
+        if (this.mode !== WikiMode.INTERNET) {
+            return false; // External index is only available in internet mode
+        }
+
         const sheet = this.getSheet('External_Index');
         const data = sheet.getDataRange().getValues();
         const now = new Date().toISOString();
@@ -395,6 +624,10 @@ export class DB {
     }
 
     removeExternalWiki(accessUrl: string): boolean {
+        if (this.mode !== WikiMode.INTERNET) {
+            return false; // External index is only available in internet mode
+        }
+
         const sheet = this.getSheet('External_Index');
         const data = sheet.getDataRange().getValues();
         for (let i = 1; i < data.length; i++) {

@@ -5,7 +5,12 @@
 
 import { DB } from './db';
 
-const db = new DB();
+/**
+ * Get DB instance with wikiId
+ */
+function getDB(wikiId?: string): DB {
+    return new DB(wikiId);
+}
 
 /**
  * Test function to verify the setup
@@ -14,6 +19,7 @@ function test() {
     Logger.log('gWiki3 Backend is running!');
 
     // Test database operations
+    const db = getDB();
     const testPage = db.createPage('Test Page', '# Hello World\n\nThis is a test page.');
     Logger.log('Created page:', testPage);
 
